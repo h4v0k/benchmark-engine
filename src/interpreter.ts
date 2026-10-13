@@ -174,7 +174,7 @@ export function evalCond(ctx: Ctx, c: Condition): boolean {
     case "is": { const t = selectPokemon(ctx, c.who); return t.length > 0 && t.every((p) => matchesFilter(topDef(p), c.filter, pokemonFacts(p))); }
     case "has": {
       const need = c.min ?? 1;
-      return countCards(ctx, { player: c.player, zone: c.zone, filter: c.filter }) >= need;
+      return countCards(ctx, { player: c.player, zone: c.zone, filter: c.filter, from: c.from }) >= need;
     }
     case "status": return selectPokemon(ctx, c.who).some((p) => p.status[statusKey(c.status)]);
     case "coin": return coin(s);
@@ -193,6 +193,17 @@ const statusKey = (st: Status): keyof PokemonInPlay["status"] =>
   ({ paralyzed: "paralyzed", confused: "confused", asleep: "asleep", burned: "burned", poisoned: "poisoned" } as const)[st];
 
 // ------------------------------------------------------------------ selectors
+/** Candidates of a `pick` selector (no choice asked). Used to tell whether a "choose 1 of your ..." effect can resolve at all. */
+export function pickCandidates(ctx: Ctx, sel: Extract<Selector, { s: "pick" }>): PokemonInPlay[] {
+  const s = S(ctx);
+  const cands: PokemonInPlay[] = [];
+  for (const pl of players(ctx, sel.player)) {
+    const ps = s.players[pl];
+    const list = sel.where === "active" ? (ps.active ? [ps.active] : []) : sel.where === "bench" ? ps.bench : inPlay(ps);
+    for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p))) cands.push(p);
+  }
+  return cands;
+}
 export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerRef, extra?: CardFilter): PokemonInPlay[] {
   const s = S(ctx);
   switch (sel.s) {
@@ -311,10 +322,14 @@ function expiry(s: GameState, d: Duration): number | undefined | "now" {
     case "whileInPlay": return undefined;
   }
 }
+/** An attack's effects on an opposing Pokémon that has "prevent all effects of attacks" (Dunsparce Dig) are ignored. */
+const shielded = (ctx: Ctx, p: PokemonInPlay): boolean =>
+  ctx.kind === "attack" && !ctx.ignoreDefEffects && hasMarker(p.markers, "preventEffects") && findPokemon(S(ctx), p.iid)?.player !== ctx.player;
 function mark(ctx: Ctx, who: Selector, key: string, d: Duration, value?: number, againstFilter?: CardFilter): void {
   const e = expiry(S(ctx), d);
   if (e === "now") return;
   for (const p of selectPokemon(ctx, who)) {
+    if (shielded(ctx, p)) continue;
     const m: Marker = { key, value, expiresAfterTurn: e, ...(againstFilter ? { againstFilter } : {}) };
     p.markers.push(m);
   }
@@ -368,7 +383,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
       return;
     case "counters": {
       const n = evalAmount(ctx, e.n);
-      const targets = selectPokemon(ctx, e.to);
+      const targets = selectPokemon(ctx, e.to).filter((t) => e.remove || !shielded(ctx, t));
       if (!targets.length) return;
       if (e.remove) { for (const t of targets) t.damage = Math.max(0, t.damage - n * 10); return; }
       if (!e.distribute || targets.length === 1) { for (const t of targets) t.damage += n * 10; return; }
@@ -458,7 +473,12 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     case "shuffle": for (const pl of players(ctx, e.player)) shuffle(zoneArr(s.players[pl], e.zone), s.rng); return;
     case "search": {
       for (const pl of players(ctx, e.player)) {
-        const { ids } = selectCards(ctx, { ...e.sel, player: "self" }, pl, true);
+        let sel: CardSel = { ...e.sel, player: "self" };
+        if (e.to === "bench") { // can't put more cards onto the Bench than there is room for
+          const free = Math.max(0, s.rules.benchSize - s.players[pl].bench.length);
+          if (countRange(ctx, sel.count).max > free) sel = { ...sel, count: { k: "upTo", n: free } };
+        }
+        const { ids } = selectCards(ctx, sel, pl, true);
         removeCards(s, pl, e.sel.zone, ids);
         if (e.to === "attached") throw new Error("search→attached: use attachEnergy");
         placeCards(ctx.run, pl, e.to, ids);
@@ -510,7 +530,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
         const n = evalAmount(ctx, e.n);
         const top = zoneArr(ps, e.zone).slice(0, n);
         const take = e.take === undefined ? 0 : evalAmount(ctx, e.take);
-        const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: 0, max: Math.min(take, top.length), prompt: "take cards" });
+        const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: Math.min(take, top.length), max: Math.min(take, top.length), prompt: "take cards" });
         for (const t of taken) removeItem(zoneArr(ps, e.zone), t);
         ps.hand.push(...taken);
         const rest = top.filter((t) => !taken.includes(t));
@@ -528,7 +548,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     }
     case "attachEnergy": {
       const owner = ctx.player;
-      const { ids } = selectCards(ctx, e.sel, owner, true);
+      const { ids } = selectCards(ctx, e.sel, owner, false); // exact counts are mandatory ("Attach a Basic Energy card"); `upTo` counts stay optional
       if (!ids.length) { ctx.didPrev = false; return; }
       const [target] = selectPokemon(ctx, e.to);
       if (!target) return;

@@ -69,7 +69,7 @@ export const FEZANDIPITI_EX = pkmn("me2pt5", "ASC", "142", "H", {
     effect: { e: "optional", do: { e: "draw", player: "self", n: 3 } },
   }],
   attacks: [atk("Cruel Arrow", ["C", "C", "C"], null, "This attack does 100 damage to 1 of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
-    { e: "damage", to: pickOpp("play"), amount: 100, weakRes: false })],
+    { e: "damage", to: pickOpp("play"), amount: 100 })], // W/R applies to the Active target only (the engine never applies it to Benched Pokémon)
 });
 
 // ---- Trainers only in this deck ----

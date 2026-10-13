@@ -1,7 +1,7 @@
 // Minimal ambient declarations so the project type-checks with ZERO dependencies
 // (no @types/node). Only the tiny surface the tests and sim use.
 declare module "node:test" {
-  export function test(name: string, fn: () => void | Promise<void>): void;
+  export function test(name: string, fn: (t: { diagnostic(msg: string): void }) => void | Promise<void>): void;
   export function describe(name: string, fn: () => void): void;
   export function it(name: string, fn: () => void | Promise<void>): void;
 }

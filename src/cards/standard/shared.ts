@@ -35,8 +35,9 @@ export const MUNKIDORI = pkmn("sv6", "TWM", "95", "H", {
   text: "Adrena-Brain: Once during your turn, if this Pokémon has any Darkness Energy attached, you may move up to 3 damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon. | Mind Bend [PC] 60: Your opponent's Active Pokémon is now Confused.",
   abilities: [{
     name: "Adrena-Brain", limit: "oncePerTurn", text: "Once during your turn, if this Pokémon has any Darkness Energy attached, you may move up to 3 damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon.",
-    trigger: { t: "ability", name: "Adrena-Brain", limit: "oncePerTurn", requires: { c: "has", player: "self", zone: "attached", filter: { type: ["D"], supertype: "energy" } } },
-    requires: { c: "has", player: "self", zone: "attached", filter: { type: ["D"], supertype: "energy" } },
+    // "if THIS Pokémon has any Darkness Energy attached" -> only Energy on Munkidori itself counts
+    trigger: { t: "ability", name: "Adrena-Brain", limit: "oncePerTurn", requires: { c: "has", player: "self", zone: "attached", from: SELF, filter: { type: ["D"], supertype: "energy" } } },
+    requires: { c: "has", player: "self", zone: "attached", from: SELF, filter: { type: ["D"], supertype: "energy" } },
     effect: { e: "optional", do: { e: "bind", as: "src", sel: pickSelf("play", { damaged: true }), then: { e: "bind", as: "dst", sel: pickOpp("play"),
       then: { e: "moveCounters", from: { s: "ref", id: "src" }, to: { s: "ref", id: "dst" }, n: { k: "upTo", n: 3 } } } } },
   }],

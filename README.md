@@ -31,9 +31,14 @@ npm test              # builds, then runs node:test (Node >= 20; developed on 22
 the choice model, ~all common DSL primitives, random agent, simulator, and an end-to-end test deck pair.
 Rare DSL nodes (`evolve` effect, `copyAttack`, `useAgain`, some `modify` stats) throw `notImplemented`.
 
-**Next:** the real card library (data -> DSL compiler, set/regulation filtering), special Energy / rule-box
-triggers (`onKnockedOut`, `onDamaged`, `wouldKO`), then a search AI (MCTS / determinized rollouts) on top of
-`legalActions` + `applyAction` + `observe`, and performance work (structural sharing instead of deep clones).
+**Milestone 2 — real Standard cards: complete.** Two real decks (Dragapult ex, N's Zoroark ex; 38 distinct cards, each with its printed
+text next to its DSL) play full games end to end: every non-trivial card has a behaviour test (`src/test/cards.test.ts`), and
+`src/test/realdecks.test.ts` plays 300 Dragapult-vs-Zoroark games plus both mirrors with random agents (no exceptions, no stuck
+games, deterministic per seed, key effects like Phantom Dive / Night Joker / Trade confirmed in the logs).
+Run any matchup outside the tests: `npm run build && node scripts/sim.mjs dragapult zoroark 300 1`.
+
+**Next:** more of the Standard card pool (remaining gaps in `docs/M2-GAPS.md`), then a search AI (MCTS / determinized rollouts)
+on top of `legalActions` + `applyAction` + `observe`, and performance work (cache static effects, structural sharing instead of deep clones).
 
 ## Real cards (Milestone 2)
 

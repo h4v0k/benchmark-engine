@@ -1,6 +1,6 @@
 import type { Condition, Effect } from "./dsl/types.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, isEnergy, isPokemon, matchesFilter, type AbilityDef, type CardDef } from "./cards/model.js";
-import { countRange, evalCond, newCtx, pokemonFacts, type Run } from "./interpreter.js";
+import { countRange, evalCond, newCtx, pickCandidates, pokemonFacts, type Run } from "./interpreter.js";
 import { abilityLocked } from "./statics.js";
 import { canPay, isFirstTurnOfGame, providedEnergy, retreatCostOf } from "./rules.js";
 import { cloneState, hasMarker, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "./state.js";
@@ -71,6 +71,12 @@ export function chooseActions(pc: PendingChoice, dedupe = true): Action[] {
 /** Effects whose top-level `switch` can't resolve (no Benched Pokémon) make a Trainer unplayable. */
 function effectUsable(s: GameState, pl: PlayerId, e: Effect): boolean {
   if (e.e === "seq") return e.steps.every((x) => effectUsable(s, pl, x));
+  if (e.e === "optional") return effectUsable(s, pl, e.do);
+  if (e.e === "bind") { // "choose 1 of your ..." with no candidate: the effect can do nothing, so it can't be used
+    if (e.sel.s === "pick" && e.sel.mode !== "all" && countRange(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel.count).min >= 1
+      && pickCandidates(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel).length === 0) return false;
+    return effectUsable(s, pl, e.then);
+  }
   if (e.e === "switch") {
     const target = e.player === "opp" ? other(pl) : e.player === "active-player" ? s.activePlayer : pl;
     const ps = s.players[target];
@@ -116,7 +122,16 @@ export function canRetreatNow(s: GameState, pl: PlayerId): boolean {
 }
 
 /** All legal actions for `player` at the current decision point. Identical cards are deduped (first copy). */
-export function legalActions(s: GameState, player: PlayerId): Action[] { return enumerate(s, player, true); }
+export function legalActions(s: GameState, player: PlayerId): Action[] {
+  const out = enumerate(s, player, true);
+  // The decider of a non-terminal state always has at least one legal action (endTurn / a valid pick); an empty list is an engine bug.
+  if (!out.length && s.phase !== "over" && decider(s) === player) {
+    const pc = s.pendingChoice;
+    throw new Error(`engine bug: no legal actions for P${player} in non-terminal state (phase ${s.phase}, turn ${s.turn}, active P${s.activePlayer}, ` +
+      `pending ${pc ? `${pc.kind} "${pc.prompt}" min ${pc.min} max ${pc.max} options [${pc.options.slice(0, 8).join(", ")}]` : "none"}); last log: ${s.log.slice(-5).join(" | ")}`);
+  }
+  return out;
+}
 
 export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Action[] {
   if (s.phase === "over" || decider(s) !== player) return [];

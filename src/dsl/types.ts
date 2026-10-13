@@ -45,7 +45,7 @@ export type Condition =
   | { c: "and" | "or"; of: Condition[] } | { c: "not"; of: Condition }
   | { c: "cmp"; a: Amount; op: "<" | "<=" | "=" | ">=" | ">"; b: Amount }
   | { c: "is"; who: Selector; filter: CardFilter }              // "opp's Active is a Pokémon ex"
-  | { c: "has"; player: PlayerRef; zone: Zone; filter: CardFilter; min?: number } // "any Darkness Energy attached"
+  | { c: "has"; player: PlayerRef; zone: Zone; filter: CardFilter; min?: number; /** zone "attached": only Energy on these Pokémon (e.g. SELF) */ from?: Selector } // "any Darkness Energy attached"
   | { c: "status"; who: Selector; status: Status }
   | { c: "coin" }                                                // heads (flip is performed here)
   | { c: "didPrev" }                                             // "if you do" / "if you drew any cards"

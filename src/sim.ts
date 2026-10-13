@@ -20,7 +20,7 @@ export function playGame(
     s = applyAction(s, agents[d]!(s, rngs[d]!));
   }
   if (s.phase === "over") return { winner: s.winner ?? null, reason: s.winReason ?? "", turns: s.turn, log: s.log };
-  return { winner: null, reason: "maxTurns", turns: s.turn, log: s.log };
+  return { winner: null, reason: s.turn > maxTurns ? "maxTurns" : "actionLimit", turns: s.turn, log: s.log };
 }
 
 export interface SimStats { games: number; wins: [number, number]; draws: number; avgTurns: number; maxTurnsSeen: number }
@@ -38,4 +38,18 @@ export function simulate(
   }
   st.avgTurns = total / n;
   return st;
+}
+
+/** Names scanned for by `keyEffectUses` (log-based proof that real card effects, not just vanilla attacks, are exercised). */
+export const KEY_EFFECTS = ["Phantom Dive", "Night Joker", "Trade", "Recon Directive", "Adrena-Brain", "Flip the Script", "Subjugating Chains", "Run Away Draw", "Last-Ditch Catch"] as const;
+/** Count uses of key attacks/abilities in a game log. Last-Ditch Catch is an on-bench trigger: counted as "benches Meowth ex" immediately followed by a deck search. */
+export function keyEffectUses(log: string[]): Record<string, number> {
+  const out: Record<string, number> = Object.fromEntries(KEY_EFFECTS.map((k) => [k, 0]));
+  log.forEach((l, i) => {
+    for (const k of KEY_EFFECTS) {
+      if (k === "Last-Ditch Catch") { if (/ benches Meowth ex$/.test(l) && /searches deck/.test(log[i + 1] ?? "")) out[k]!++; }
+      else if (l.endsWith(` uses ${k}`) || l.endsWith(` uses ability ${k}`)) out[k]!++;
+    }
+  });
+  return out;
 }
