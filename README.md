@@ -34,3 +34,16 @@ Rare DSL nodes (`evolve` effect, `copyAttack`, `useAgain`, some `modify` stats) 
 **Next:** the real card library (data -> DSL compiler, set/regulation filtering), special Energy / rule-box
 triggers (`onKnockedOut`, `onDamaged`, `wouldKO`), then a search AI (MCTS / determinized rollouts) on top of
 `legalActions` + `applyAction` + `observe`, and performance work (structural sharing instead of deep clones).
+
+## Real cards (Milestone 2)
+
+Decklists live in `data/decks/*.txt` (Limitless format: `count name SET number`). Raw card data is extracted from a local
+clone of [PokemonTCG/pokemon-tcg-data](https://github.com/PokemonTCG/pokemon-tcg-data) — the clone path is a CLI argument, never hardcoded:
+
+```sh
+node scripts/extract-cards.mjs <path-to-pokemon-tcg-data> data/decks/dragapult-ex.txt data/decks/ns-zoroark-ex.txt [--out data/cards]
+```
+
+It resolves each card via the set's `ptcgoCode` + number (falling back to exact name, newest printing with regulationMark >= H),
+writes `data/cards/<setId>-<number>.json`, and prints a resolution table. Basic Energy is synthesized in code, not extracted.
+DSL definitions: `src/cards/standard/` (`CARD_DEFS`, `DRAGAPULT_EX_DECK`, `NS_ZOROARK_EX_DECK`, `deckFromList`). Engine gaps: `docs/M2-GAPS.md`.

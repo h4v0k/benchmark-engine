@@ -1,0 +1,52 @@
+{
+  "id": "me3-62",
+  "name": "Meowth ex",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic",
+    "ex"
+  ],
+  "hp": "170",
+  "types": [
+    "Colorless"
+  ],
+  "abilities": [
+    {
+      "name": "Last-Ditch Catch",
+      "text": "Once during your turn, when you play this Pokémon from your hand onto your Bench, you may use this Ability. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck. You can't use more than 1 Ability that has \"Last-Ditch\" in its name each turn.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Tuck Tail",
+      "cost": [
+        "Colorless",
+        "Colorless",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 3,
+      "damage": "60",
+      "text": "Put this Pokémon and all attached cards into your hand."
+    }
+  ],
+  "rules": [
+    "Pokémon ex rule: When your Pokémon ex is Knocked Out, your opponent takes 2 Prize cards."
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "J",
+  "number": "62",
+  "rarity": "Double Rare",
+  "set": {
+    "id": "me3",
+    "ptcgoCode": "POR"
+  }
+}

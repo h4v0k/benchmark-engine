@@ -1,0 +1,22 @@
+{
+  "id": "sv6-165",
+  "name": "Unfair Stamp",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item",
+    "ACE SPEC"
+  ],
+  "rules": [
+    "You can't have more than 1 ACE SPEC card in your deck.",
+    "You can use this card only if any of your Pokémon were Knocked Out during your opponent's last turn.    Each player shuffles their hand into their deck. Then, you draw 5 cards, and your opponent draws 2 cards.",
+    "You may play any number of Item cards during your turn.",
+    "ACE SPEC: You can't have more than 1 ACE SPEC card in your deck."
+  ],
+  "regulationMark": "H",
+  "number": "165",
+  "rarity": "ACE SPEC Rare",
+  "set": {
+    "id": "sv6",
+    "ptcgoCode": "TWM"
+  }
+}

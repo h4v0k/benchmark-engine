@@ -1,0 +1,39 @@
+{
+  "id": "me2-14",
+  "name": "Moltres",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "120",
+  "types": [
+    "Fire"
+  ],
+  "attacks": [
+    {
+      "name": "Fighting Wings",
+      "cost": [
+        "Fire"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "20+",
+      "text": "If your opponent's Active Pokémon is a Pokémon ex, this attack does 90 more damage."
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Water",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "I",
+  "number": "14",
+  "rarity": "Rare",
+  "set": {
+    "id": "me2",
+    "ptcgoCode": "PFL"
+  }
+}

@@ -20,6 +20,8 @@ export interface AbilityDef {
   effect: Effect;
   limit?: "oncePerTurn" | "oncePerGame";
   requires?: Condition;
+  /** original printed text, for reviewers */
+  text?: string;
 }
 export interface CardDef {
   id: string;
@@ -38,6 +40,8 @@ export interface CardDef {
   resistance?: { type: EnergyType; amount: 30 };
   retreatCost?: number;
   prizeValue?: 1 | 2 | 3;
+  /** original printed card text (all of it), alongside the DSL, for review */
+  text?: string;
   regulationMark?: string;
   setCode?: string;
   number?: string;

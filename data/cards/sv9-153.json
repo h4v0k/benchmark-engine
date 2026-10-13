@@ -1,0 +1,19 @@
+{
+  "id": "sv9-153",
+  "name": "N's PP Up",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "Attach a Basic Energy card from your discard pile to 1 of your Benched N's Pokémon.",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "I",
+  "number": "153",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "sv9",
+    "ptcgoCode": "JTG"
+  }
+}

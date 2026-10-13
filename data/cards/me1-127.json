@@ -1,0 +1,19 @@
+{
+  "id": "me1-127",
+  "name": "Risky Ruins",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Stadium"
+  ],
+  "rules": [
+    "Whenever any player puts a Basic non-Darkness Pokémon onto their Bench during their turn, place 2 damage counters on that Pokémon.",
+    "You may play only 1 Stadium card during your turn. Put it next to the Active Spot, and discard it if another Stadium comes into play. A Stadium with the same name can't be played."
+  ],
+  "regulationMark": "I",
+  "number": "127",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me1",
+    "ptcgoCode": "MEG"
+  }
+}

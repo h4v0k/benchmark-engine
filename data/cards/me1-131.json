@@ -1,0 +1,19 @@
+{
+  "id": "me1-131",
+  "name": "Ultra Ball",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "You can use this card only if you discard 2 other cards from your hand.  Search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "I",
+  "number": "131",
+  "rarity": "Common",
+  "set": {
+    "id": "me1",
+    "ptcgoCode": "MEG"
+  }
+}
