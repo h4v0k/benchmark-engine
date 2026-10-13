@@ -50,24 +50,43 @@ export interface CardInstance { iid: string; defId: string }
 
 // ---- registry: instance ids are `${defId}#${n}`; defs are immutable data looked up by id -------------
 const REG = new Map<string, CardDef>();
-export function registerCards(defs: Iterable<CardDef>): void { for (const d of defs) REG.set(d.id, d); }
+/** iid -> def memo (iids are `${defId}#${n}`, so the mapping only changes if a def id is re-registered with a different def) */
+const BY_IID = new Map<string, CardDef>();
+export function registerCards(defs: Iterable<CardDef>): void {
+  for (const d of defs) { const old = REG.get(d.id); if (old && old !== d) BY_IID.clear(); REG.set(d.id, d); }
+}
+/** All registered defs (insertion order). */
+export const registrySize = (): number => REG.size;
+export const registeredDefs = (): IterableIterator<CardDef> => REG.values();
 export function getDef(id: string): CardDef {
   const d = REG.get(id);
   if (!d) throw new Error(`unknown card def: ${id}`);
   return d;
 }
-export const defIdOf = (iid: string): string => iid.slice(0, iid.lastIndexOf("#"));
-export const defOf = (iid: string): CardDef => getDef(defIdOf(iid));
+const rawDefId = (iid: string): string => iid.slice(0, iid.lastIndexOf("#"));
+export const defIdOf = (iid: string): string => defOf(iid).id;
+export function defOf(iid: string): CardDef {
+  let d = BY_IID.get(iid);
+  if (d === undefined) { d = getDef(rawDefId(iid)); BY_IID.set(iid, d); }
+  return d;
+}
 export const instanceOf = (iid: string): CardInstance => ({ iid, defId: defIdOf(iid) });
 
 // ---- predicates -------------------------------------------------------------------------------------
-const norm = (s: string) => s.toLowerCase().replace(/[\s_-]/g, "");
+const NORM = new Map<string, string>();
+/** lowercase, spaces/underscores/hyphens removed; memoized (called on every filter test) */
+const norm = (s: string): string => {
+  let r = NORM.get(s);
+  if (r === undefined) { r = s.toLowerCase().replace(/[\s_-]/g, ""); NORM.set(s, r); }
+  return r;
+};
+const RULE_BOX = ["ex", "megaex", "v", "vmax", "vstar"];
 export function hasSub(d: CardDef, sub: string): boolean {
-  const n = norm(sub);
-  const subs = d.subtypes.map(norm);
-  if (n === "mega") return subs.includes("megaex");
-  if (n === "rulebox") return subs.some((x) => ["ex", "megaex", "v", "vmax", "vstar"].includes(x));
-  return subs.includes(n);
+  const n = norm(sub), subs = d.subtypes;
+  if (n === "rulebox") { for (let i = 0; i < subs.length; i++) if (RULE_BOX.includes(norm(subs[i]!))) return true; return false; }
+  const want = n === "mega" ? "megaex" : n;
+  for (let i = 0; i < subs.length; i++) if (norm(subs[i]!) === want) return true;
+  return false;
 }
 export const isPokemon = (d: CardDef) => d.supertype === "Pokemon";
 export const isEnergy = (d: CardDef) => d.supertype === "Energy";

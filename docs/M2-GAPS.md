@@ -26,4 +26,4 @@ real-deck simulations: `src/test/realdecks.test.ts` and `scripts/sim.mjs`. What 
 None of the 38 cards. Note: N's Zoroark ex's Trade has no "only 1 Trade each turn" clause in print, so it is `oncePerTurn` per Pokémon (two Zoroark ex can each Trade); Fezandipiti ex, Pecharunt ex and Meowth ex carry the printed name limits.
 
 ## Performance (see README / report)
-- `statics.sources()` rescans the whole board for every static query and `deepClone` copies the full state on every action; both are the obvious first optimisations.
+- Done in M3a (about 30 to 100 games/s greedy-vs-greedy): see `docs/ENGINE.md`, "Performance".

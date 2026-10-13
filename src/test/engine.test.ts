@@ -376,13 +376,13 @@ test("observe redacts hidden information", () => {
   assert.ok(!JSON.stringify(o).includes(s.players[1].deck[0]!));
 });
 
-test("determinism: same seed -> identical log; different seed differs", () => {
+test("determinism: same seed -> identical event stream; different seed differs", () => {
   const a = playGame(deckA, deckB, 42, randomAgent, randomAgent);
   const b = playGame(deckA, deckB, 42, randomAgent, randomAgent);
   const c = playGame(deckA, deckB, 43, randomAgent, randomAgent);
-  assert.deepEqual(a.log, b.log);
+  assert.equal(JSON.stringify(a.events), JSON.stringify(b.events));
   assert.equal(a.winner, b.winner);
-  assert.notEqual(a.log.join("\n"), c.log.join("\n"));
+  assert.notEqual(JSON.stringify(a.events), JSON.stringify(c.events));
 });
 
 test("smoke: 200 random-agent games finish with no exceptions and none hit maxTurns", () => {

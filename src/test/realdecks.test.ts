@@ -24,7 +24,7 @@ function batch(a: CardDef[], b: CardDef[], n: number, keepLogs = false, agentA: 
     r.turns += res.turns;
     r.reasons[res.reason] = (r.reasons[res.reason] ?? 0) + 1;
     if (res.winner === null) r.draws++; else if ((res.winner === 0) === aFirst) r.winsA++; else r.winsB++;
-    for (const [k, c] of Object.entries(keyEffectUses(res.log))) r.uses[k]! += c;
+    for (const [k, c] of Object.entries(keyEffectUses(res.events))) r.uses[k]! += c;
     if (keepLogs) r.results.push(res);
   }
   return r;
@@ -51,11 +51,11 @@ test("100 games Dragapult mirror and 100 games Zoroark mirror finish cleanly", (
   assert.ok(z.uses["Night Joker"]! > 0 && z.uses["Trade"]! > 0);
 });
 
-test("determinism: the same seed replays to an identical log and result", () => {
+test("determinism: the same seed replays to an identical event stream and result", () => {
   for (const seed of [1, 7, 42, 123]) {
     const a = playGame(DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK, seed, randomAgent, randomAgent, 200);
     const b = playGame(DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK, seed, randomAgent, randomAgent, 200);
-    assert.deepEqual(a.log, b.log);
+    assert.equal(JSON.stringify(a.events), JSON.stringify(b.events));
     assert.deepEqual([a.winner, a.reason, a.turns], [b.winner, b.reason, b.turns]);
   }
 });
@@ -74,18 +74,19 @@ test("rules sanity over 120 real-deck games: ex = 2 Prizes / non-ex = 1, 1 natur
         const act = agent(s, rngs[d]!);
         const pre = s, preDeck = s.players.map((p) => p.deck.length), prePrizes = s.players.map((p) => p.prizes.length);
         s = applyAction(s, act);
-        const fresh = s.log.slice(seen); seen = s.log.length;
+        const fresh = s.events.slice(seen); seen = s.events.length;
         const taken: Record<string, number> = {};
         let ko = "";
-        for (const l of fresh) {
-          const k = l.match(/^T\d+ P\d (.+) is Knocked Out$/); if (k) { ko = k[1]!; kos++; }
-          const m = l.match(/^T\d+ P(\d) takes (\d+) prize/);
-          if (m) {
-            const left = prePrizes[Number(m[1])]! - (taken[m[1]!] ?? 0);
-            assert.equal(Number(m[2]), Math.min(/ ex$/.test(ko) ? 2 : 1, left), `${label} seed ${seed}: ${ko} prize count`);
-            taken[m[1]!] = (taken[m[1]!] ?? 0) + Number(m[2]);
+        fresh.forEach((e, i) => {
+          if (e.type === "ko") {
+            ko = e.pokemonName; kos++;
+            const left = prePrizes[e.takenBy]! - (taken[e.takenBy] ?? 0);
+            assert.equal(e.prizesTaken, Math.min(/ ex$/.test(ko) ? 2 : 1, left), `${label} seed ${seed}: ${ko} prize count`);
+            taken[e.takenBy] = (taken[e.takenBy] ?? 0) + e.prizesTaken;
+            const nx = fresh[i + 1];
+            assert.ok(nx?.type === "prize" && nx.count === e.prizesTaken && nx.player === e.takenBy, `${label} seed ${seed}: prize event follows each KO`);
           }
-        }
+        });
         if (pre.turn > 0 && !s.pendingChoice && s.turn !== pre.turn && s.phase !== "over")
           assert.equal(s.players[s.activePlayer].deck.length - preDeck[s.activePlayer]!, -1, `${label} seed ${seed}: natural draw is exactly 1 card`);
         if (!s.pendingChoice) for (const ps of s.players) {

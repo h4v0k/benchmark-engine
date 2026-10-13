@@ -1,12 +1,14 @@
 import type { Action } from "./actions.js";
-import { abilityIsNameLimited, actionKey, decider, enumerate } from "./actions.js";
+import { abilityIsNameLimited, decider, enumerate, sameAction } from "./actions.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, prizeValueOf, registerCards, type CardDef } from "./cards/model.js";
 import { NeedChoice, Run, applyDamage, ask, coin, fireEndOfTurn, fireOnBenched, fireOnDamaged, fireOnEvolve, fireOnKnockedOut, newCtx, runEffect, validPicks } from "./interpreter.js";
+import type { CheckupResult, EventOf } from "./events.js";
 import { flip, makeRng, shuffle } from "./rng.js";
 import { attackerBonus, maxHp } from "./rules.js";
+import { withStaticSnapshot } from "./statics.js";
 import {
   DEFAULT_RULES, type GameState, type PlayerId, type PokemonInPlay, type RulesConfig,
-  cloneState, discardPokemon, drawCards, emptyFlags, expireMarkers, findPokemon, inPlay, log, mintCard,
+  cloneState, discardPokemon, drawEmit, emit, emptyFlags, expireMarkers, findPokemon, inPlay, mintCard,
   newPlayer, newPokemon, other, removeItem, setWinner, swapActive, topDef,
 } from "./state.js";
 
@@ -15,15 +17,15 @@ export function createGame(deckA: CardDef[], deckB: CardDef[], seed: number, rul
   registerCards([...deckA, ...deckB]);
   const s: GameState = {
     seed, rng: makeRng(seed), nextId: 1, turn: 0, activePlayer: 0, firstPlayer: 0, phase: "mulliganAck",
-    players: [newPlayer(), newPlayer()], log: [], rules: { ...DEFAULT_RULES, ...rules },
+    players: [newPlayer(), newPlayer()], events: [], rules: { ...DEFAULT_RULES, ...rules },
     setup: { mulls: [0, 0], acked: [false, false], benchDone: [false, false] },
   };
   ([deckA, deckB] as CardDef[][]).forEach((deck, pl) => {
     s.players[pl]!.deck = shuffle(deck.map((d) => mintCard(s, d.id)), s.rng);
   });
   s.firstPlayer = s.activePlayer = flip(s.rng) ? 0 : 1;
-  log(s, `P${s.firstPlayer} goes first`);
-  for (const pl of [0, 1] as PlayerId[]) drawCards(s, pl, s.rules.handSize);
+  emit(s, { type: "gameStart", seed, decks: [deckA.map((d) => d.id).sort(), deckB.map((d) => d.id).sort()], firstPlayer: s.firstPlayer });
+  for (const pl of [0, 1] as PlayerId[]) drawEmit(s, pl, s.rules.handSize, "setup");
   // mulligan loop: reveal, reshuffle, redraw until a Basic is in hand
   for (const pl of [0, 1] as PlayerId[]) {
     const ps = s.players[pl];
@@ -31,10 +33,10 @@ export function createGame(deckA: CardDef[], deckB: CardDef[], seed: number, rul
     while (!ps.hand.some((c) => isBasicPokemon(defOf(c)))) {
       if (++guard > 200) throw new Error("deck cannot produce a Basic Pokémon hand");
       s.setup!.mulls[pl]++;
-      log(s, `P${pl} mulligans (reveals hand)`);
+      emit(s, { type: "mulligan", player: pl });
       ps.deck.push(...ps.hand); ps.hand = [];
       shuffle(ps.deck, s.rng);
-      drawCards(s, pl, s.rules.handSize);
+      drawEmit(s, pl, s.rules.handSize, "setup");
     }
   }
   s.phase = "mulliganAck";
@@ -70,7 +72,7 @@ function finishSetup(s: GameState): void {
   s.phase = "main";
   s.turn = 1;
   s.activePlayer = s.firstPlayer;
-  log(s, "setup complete");
+  emit(s, { type: "setupComplete" });
   beginTurn(s);
 }
 
@@ -80,24 +82,28 @@ function beginTurn(s: GameState): void {
   const ps = s.players[pl];
   ps.flags = { ...emptyFlags(), gxUsed: ps.flags.gxUsed, vstarUsed: ps.flags.vstarUsed };
   for (const p of inPlay(ps)) { p.evolvedThisTurn = false; p.usedAbilities = []; }
-  if (drawCards(s, pl, 1) === 0) { setWinner(s, other(pl), "deckout"); return; }
-  log(s, `P${pl} turn begins`);
+  emit(s, { type: "turnStart", player: pl });
+  if (drawEmit(s, pl, 1, "turn") === 0) setWinner(s, other(pl), "deckout");
 }
 
 function checkup(run: Run): void {
   const s = run.s;
   const ender = s.activePlayer;
   const actives = ([0, 1] as PlayerId[]).map((pl) => s.players[pl].active);
-  actives.forEach((a, pl) => { if (a?.status.poisoned) { applyDamage(s, a, 10, { wr: false }); log(s, `P${pl} ${topDef(a).name} poison 10`); } });
+  const results: CheckupResult[] = [];
+  const note = (pl: number, a: PokemonInPlay, kind: CheckupResult["kind"], damage?: number) =>
+    results.push({ player: pl as PlayerId, pokemonId: a.iid, pokemonName: topDef(a).name, kind, ...(damage ? { damage } : {}) });
+  actives.forEach((a, pl) => { if (a?.status.poisoned) { const d = applyDamage(s, a, 10, { wr: false }); note(pl, a, "poison", d); } });
   actives.forEach((a, pl) => {
     if (!a?.status.burned) return;
-    applyDamage(s, a, 20, { wr: false });
-    log(s, `P${pl} ${topDef(a).name} burn 20`);
-    if (coin(s)) a.status.burned = false;
+    const d = applyDamage(s, a, 20, { wr: false });
+    note(pl, a, "burn", d);
+    if (coin(s)) { a.status.burned = false; note(pl, a, "burnCured"); }
   });
-  actives.forEach((a) => { if (a?.status.asleep && coin(s)) a.status.asleep = false; });
+  actives.forEach((a, pl) => { if (a?.status.asleep && coin(s)) { a.status.asleep = false; note(pl, a, "wokeUp"); } });
   // Paralysis ends at the end of the paralyzed Pokémon's controller's own turn.
-  actives.forEach((a, pl) => { if (a?.status.paralyzed && pl === ender) a.status.paralyzed = false; });
+  actives.forEach((a, pl) => { if (a?.status.paralyzed && pl === ender) { a.status.paralyzed = false; note(pl, a, "paralysisEnded"); } });
+  if (results.length) emit(s, { type: "checkup", results });
 }
 
 /** Resolve all Knock Outs simultaneously: discard, prizes, win checks, then promotions (may ask). */
@@ -106,21 +112,23 @@ function resolveKOs(run: Run): void {
   if (s.phase === "over") return;
   const collect = (): Array<[PlayerId, PokemonInPlay]> => {
     const out: Array<[PlayerId, PokemonInPlay]> = [];
-    for (const pl of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[pl])) if (p.damage >= maxHp(s, p)) out.push([pl, p]);
+    withStaticSnapshot(s, () => { for (const pl of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[pl])) if (p.damage >= maxHp(s, p)) out.push([pl, p]); });
     return out;
   };
   let kos = collect();
   for (const [pl, p] of kos) fireOnKnockedOut(run, pl, p); // before removal; may add more damage
   kos = collect();
   for (const [pl, p] of kos) {
-    log(s, `P${pl} ${topDef(p).name} is Knocked Out`);
+    const byAttack = pl !== s.activePlayer && !!run.attackKOs?.includes(p.iid);
     const prizes = prizeValueOf(topDef(p));
+    const iid = p.iid, name = topDef(p).name;
     discardPokemon(s, pl, p);
     s.players[pl].lastKOTurn = s.turn;
     const opp = s.players[other(pl)];
     const take = Math.min(prizes, opp.prizes.length);
     opp.hand.push(...opp.prizes.splice(0, take));
-    log(s, `P${other(pl)} takes ${take} prize(s)`);
+    emit(s, { type: "ko", owner: pl, pokemonId: iid, pokemonName: name, byAttack, prizesTaken: take, takenBy: other(pl) });
+    emit(s, { type: "prize", player: other(pl), count: take, remaining: opp.prizes.length });
   }
   const wins: Array<[PlayerId, string]> = [];
   for (const pl of [0, 1] as PlayerId[]) {
@@ -139,7 +147,7 @@ function resolveKOs(run: Run): void {
     if (!ps.active && ps.bench.length) {
       const [pick] = ask(run, { player: pl, kind: "pokemon", options: ps.bench.map((b) => b.iid), min: 1, max: 1, prompt: "promote a new Active Pokémon" });
       swapActive(s, pl, pick!);
-      log(s, `P${pl} promotes ${topDef(ps.active!).name}`);
+      emit(s, { type: "switch", player: pl, pokemonId: ps.active!.iid, pokemonName: topDef(ps.active!).name, reason: "promote" });
     }
   }
 }
@@ -147,7 +155,6 @@ function resolveKOs(run: Run): void {
 function endTurnSequence(run: Run): void {
   const s = run.s;
   if (s.phase === "over") return;
-  log(s, `P${s.activePlayer} ends turn`);
   fireEndOfTurn(run);
   expireMarkers(s);
   checkup(run);
@@ -162,7 +169,7 @@ function endTurnSequence(run: Run): void {
 function playTrainer(run: Run, pl: PlayerId, card: string, kind: "item" | "supporter"): void {
   const s = run.s, ps = s.players[pl];
   removeItem(ps.hand, card);
-  log(s, `P${pl} plays ${defOf(card).name}`);
+  emit(s, { type: "play", player: pl, cardId: card, cardName: defOf(card).name, kind });
   const entry = defOf(card).rules?.find((r) => r.trigger.t === "play");
   if (entry) {
     const ctx = newCtx(run, pl, kind);
@@ -177,13 +184,19 @@ function executeAttack(run: Run, pl: PlayerId, idx: number): void {
   const s = run.s;
   const atk = s.players[pl].active!;
   const a = topDef(atk).attacks![idx]!;
-  log(s, `P${pl} ${topDef(atk).name} uses ${a.name}`);
+  const def = s.players[other(pl)].active;
+  // pushed now (so effect/coin events follow it) and finished below once the damage is known
+  const ev = { type: "attack", turn: s.turn, player: pl, attackerId: atk.iid, attackerName: topDef(atk).name, attackName: a.name,
+    targetId: def?.iid ?? null, targetName: def ? topDef(def).name : null, damage: 0, ko: false } as EventOf<"attack">;
+  s.events.push(ev);
+  run.attackEvent = ev;
   if (atk.status.confused && !coin(s)) {
-    applyDamage(s, atk, 30, { wr: false });
-    log(s, "confused: attack fails, 30 damage to itself");
+    const d = applyDamage(s, atk, 30, { wr: false });
+    ev.failed = "confused";
+    emit(s, { type: "damageCounters", player: pl, owner: pl, targetId: atk.iid, targetName: topDef(atk).name, amount: d / 10, source: "confusion" });
     return;
   }
-  if (atk.markers.some((m) => m.key === "attackTry") && !coin(s)) { log(s, "attack fails"); return; }
+  if (atk.markers.some((m) => m.key === "attackTry") && !coin(s)) { ev.failed = "attackTry"; return; }
   const ctx = newCtx(run, pl, "attack", { self: atk.iid });
   ctx.dmg = a.damage && a.damage > 0 ? a.damage : null;
   if (a.effect) runEffect(ctx, a.effect);
@@ -192,7 +205,7 @@ function executeAttack(run: Run, pl: PlayerId, idx: number): void {
     let raw = ctx.dmg + ctx.mods;
     if (raw > 0) raw += attackerBonus(s, atk, target);
     const dealt = applyDamage(s, target, raw, { attacker: atk, wr: true, byAttack: true, ignoreEffects: ctx.ignoreDefEffects });
-    log(s, `${topDef(target).name} takes ${dealt}`);
+    ev.damage = dealt;
     fireOnDamaged(run, atk, target, dealt);
   }
 }
@@ -206,34 +219,36 @@ function execute(run: Run, a: Action): void {
       removeItem(ps.hand, a.card);
       const np = newPokemon(a.card, s.turn);
       ps.bench.push(np);
-      log(s, `P${pl} benches ${defOf(a.card).name}`);
+      emit(s, { type: "play", player: pl, cardId: a.card, cardName: defOf(a.card).name, kind: "basic" });
       fireOnBenched(run, np, pl, true);
       resolveKOs(run);
       return;
     case "evolve": {
       const t = findPokemon(s, a.target)!.p;
       removeItem(ps.hand, a.card);
+      const fromId = t.iid, fromName = topDef(t).name;
       t.below.push(t.iid);
       t.iid = a.card;
       t.evolvedThisTurn = true;
       t.status = { asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false };
       t.markers = []; t.usedAbilities = [];
-      log(s, `P${pl} evolves into ${defOf(a.card).name}`);
+      emit(s, { type: "evolve", player: pl, from: fromId, to: a.card, fromName, toName: defOf(a.card).name });
       fireOnEvolve(run, pl, t);
       resolveKOs(run);
       return;
     }
     case "attachEnergy": {
       removeItem(ps.hand, a.card);
-      findPokemon(s, a.target)!.p.energy.push(a.card);
+      const host = findPokemon(s, a.target)!.p;
+      host.energy.push(a.card);
       ps.flags.energyAttachedThisTurn = true;
-      log(s, `P${pl} attaches ${defOf(a.card).name}`);
+      emit(s, { type: "attachEnergy", player: pl, cardId: a.card, cardName: defOf(a.card).name, targetId: host.iid, targetName: topDef(host).name, source: "hand" });
       return;
     }
     case "attachTool":
       removeItem(ps.hand, a.card);
       findPokemon(s, a.target)!.p.tool = a.card;
-      log(s, `P${pl} attaches tool ${defOf(a.card).name}`);
+      emit(s, { type: "play", player: pl, cardId: a.card, cardName: defOf(a.card).name, kind: "tool", targetId: a.target });
       return;
     case "playItem": return playTrainer(run, pl, a.card, "item");
     case "playSupporter": ps.flags.supporterPlayedThisTurn = true; return playTrainer(run, pl, a.card, "supporter");
@@ -242,14 +257,14 @@ function execute(run: Run, a: Action): void {
       if (s.stadium) s.players[s.stadium.owner].discard.push(s.stadium.iid);
       s.stadium = { iid: a.card, owner: pl };
       ps.flags.stadiumPlayedThisTurn = true;
-      log(s, `P${pl} plays stadium ${defOf(a.card).name}`);
+      emit(s, { type: "play", player: pl, cardId: a.card, cardName: defOf(a.card).name, kind: "stadium" });
       return;
     case "useAbility": {
       const p = findPokemon(s, a.pokemon)!.p;
       const ab = topDef(p).abilities![a.abilityIndex]!;
       if (ab.limit === "oncePerGame") ps.usedGameAbilities.push(ab.name); else p.usedAbilities.push(ab.name);
       if (abilityIsNameLimited(ab)) ps.flags.abilityNamesUsed.push(ab.name);
-      log(s, `P${pl} uses ability ${ab.name}`);
+      emit(s, { type: "ability", player: pl, pokemonId: p.iid, pokemonName: topDef(p).name, name: ab.name });
       const ctx = newCtx(run, pl, "ability", { self: p.iid });
       if (ab.trigger?.t === "ability" && ab.trigger.costToUse) runEffect(ctx, ab.trigger.costToUse); // cost first, via choices
       runEffect(ctx, ab.effect);
@@ -261,15 +276,18 @@ function execute(run: Run, a: Action): void {
       ps.discard.push(...a.energyToDiscard);
       const old = ps.active!;
       old.energy = old.energy.filter((e) => !a.energyToDiscard.includes(e));
+      if (a.energyToDiscard.length) emit(s, { type: "discard", player: pl, zone: "attached", cardIds: a.energyToDiscard.slice() });
       swapActive(s, pl, a.newActive);
       ps.flags.retreatedThisTurn = true;
-      log(s, `P${pl} retreats to ${topDef(ps.active!).name}`);
+      emit(s, { type: "switch", player: pl, pokemonId: ps.active!.iid, pokemonName: topDef(ps.active!).name, replacedId: old.iid, reason: "retreat" });
       return;
     }
     case "attack":
       executeAttack(run, pl, a.attackIndex);
       run.attackKOs = [];
-      for (const q of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[q])) if (p.damage >= maxHp(s, p)) run.attackKOs.push(p.iid);
+      const kos = run.attackKOs;
+      withStaticSnapshot(s, () => { for (const q of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[q])) if (p.damage >= maxHp(s, p)) kos.push(p.iid); });
+      if (run.attackEvent?.targetId) run.attackEvent.ko = run.attackKOs.includes(run.attackEvent.targetId);
       resolveKOsThenEnd(run);
       return;
     case "endTurn": endTurnSequence(run); return;
@@ -279,11 +297,15 @@ function execute(run: Run, a: Action): void {
 function resolveKOsThenEnd(run: Run): void { endTurnSequence(run); }
 
 // =============================================================== public step function
-export function applyAction(state: GameState, action: Action): GameState {
+export interface ApplyOptions {
+  /** Skip the legality check. Only for drivers that took `action` straight from `legalActions(state, ...)` on this unmodified state (see `wasIssued`). */
+  trusted?: boolean;
+}
+export function applyAction(state: GameState, action: Action, opts: ApplyOptions = {}): GameState {
   if (state.phase === "over") throw new Error("game is over");
   const who = decider(state);
   if (who === null) throw new Error("no decider");
-  validate(state, action, who);
+  if (!opts.trusted) validate(state, action, who);
   if (action.type === "choose") return applyChoose(state, action);
   switch (action.type) {
     case "mulliganAck": case "chooseActive": case "chooseBench": return applySetup(state, action, who);
@@ -298,8 +320,7 @@ function validate(s: GameState, a: Action, who: PlayerId): void {
     if (!validPicks(pc, a.picks)) throw new Error(`invalid picks ${JSON.stringify(a.picks)}`);
     return;
   }
-  const k = actionKey(a);
-  if (!enumerate(s, who, false).some((x) => actionKey(x) === k)) throw new Error(`illegal action: ${JSON.stringify(a)}`);
+  if (!enumerate(s, who, false).some((x) => sameAction(x, a))) throw new Error(`illegal action: ${JSON.stringify(a)}`);
 }
 
 function runOrPend(base: GameState, action: Action, answers: string[][]): GameState {
@@ -323,8 +344,7 @@ function applyChoose(state: GameState, a: Extract<Action, { type: "choose" }>): 
     const s = cloneState(state);
     s.pendingChoice = undefined;
     const n = Number(a.picks[0]);
-    const drawn = drawCards(s, pc.player, n);
-    log(s, `P${pc.player} draws ${drawn} extra card(s) from mulligans`);
+    drawEmit(s, pc.player, n, "mulligan");
     s.phase = "setupActive";
     advanceSetup(s);
     return s;
@@ -336,7 +356,7 @@ function applySetup(state: GameState, a: Action, who: PlayerId): GameState {
   const s = cloneState(state);
   const su = s.setup!;
   const ps = s.players[who];
-  if (a.type === "mulliganAck") { su.acked[who] = true; log(s, `P${who} reveals hand after mulligan`); }
+  if (a.type === "mulliganAck") su.acked[who] = true;
   else if (a.type === "chooseActive") { removeItem(ps.hand, a.card); ps.active = newPokemon(a.card, 0); }
   else if (a.type === "chooseBench") {
     if (a.card) { removeItem(ps.hand, a.card); ps.bench.push(newPokemon(a.card, 0)); }

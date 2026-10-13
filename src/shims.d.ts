@@ -17,3 +17,11 @@ declare module "node:assert/strict" {
   export default assert;
 }
 declare const console: { log(...a: unknown[]): void; error(...a: unknown[]): void };
+declare module "node:fs" {
+  export function writeFileSync(path: string, data: string): void;
+  export function readFileSync(path: string, enc: "utf8"): string;
+  export function readFileSync(path: URL | string, enc: "utf8"): string;
+}
+declare module "node:fs" {
+  export function unlinkSync(path: string): void;
+}

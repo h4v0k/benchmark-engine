@@ -1,0 +1,9 @@
+{
+  "name": "dragapult-9th-energy",
+  "base": { "deck": "dragapult", "name": "Dragapult ex (Recife 3rd place list)" },
+  "variants": [ { "name": "9 Energy (4 Psychic)", "change": "-1 Night Stretcher +1 Psychic Energy" } ],
+  "field": [ { "deck": "dragapult", "name": "Dragapult ex", "weight": 33.4 }, { "deck": "zoroark", "name": "N's Zoroark ex", "weight": 9.4 } ],
+  "gamesPerMatchup": 400, "agent": "greedy", "seedBase": 1000,
+  "screen": { "agent": "greedy", "gamesPerMatchup": 400, "keep": 1 },
+  "confirm": { "agent": "search:fast", "gamesPerMatchup": 2000 }
+}
