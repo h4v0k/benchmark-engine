@@ -1,0 +1,15 @@
+{
+  "name": "benchmark-engine",
+  "version": "0.1.0",
+  "description": "Zero-dependency Pokémon TCG (Standard) rules engine and simulation core",
+  "type": "module",
+  "private": false,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/*.test.js"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,36 @@
+# benchmark-engine
+
+Open-source **Pokémon TCG (Standard) rules engine and simulation core** — the backend for Benchmark.
+Pure TypeScript, **zero runtime dependencies**, deterministic from a seed, and designed as a pure state machine so
+agents, UIs and search algorithms can all drive it the same way.
+
+## Build & test
+
+```sh
+npm i -g typescript   # or use `npx -p typescript tsc ...`; the repo itself has no dependencies
+npm run typecheck
+npm test              # builds, then runs node:test (Node >= 20; developed on 22)
+```
+
+## Architecture (in 10 lines)
+
+1. `src/dsl/types.ts` — the effect DSL (cards are data: `Entry[]` of trigger + effect). See `docs/DSL.md`.
+2. `src/cards/model.ts` — `CardDef`, card registry, filters, deck validation. `test-cards.ts` is a small hand-written set.
+3. `src/state.ts` — plain JSON-serializable `GameState`; `observe()` returns a hidden-information-safe view.
+4. `src/rng.ts` — seeded mulberry32; all randomness (shuffles, coins) flows through `state.rng`.
+5. `src/interpreter.ts` — executes DSL effects; decisions surface as a resumable *pending choice* (no callbacks).
+6. `src/actions.ts` — the `Action` union and `legalActions(state, player)`.
+7. `src/game.ts` — setup/mulligan, turn loop, Pokémon Checkup, KO/prize/win handling, `applyAction(state, action)`.
+8. `src/agents/random.ts` — random agent; `src/sim.ts` — `playGame` / `simulate`.
+9. `applyAction` never mutates its input (clone-on-write), so tree search can branch freely.
+10. Rules flags live in `RulesConfig` so rule-version differences are data, not code. See `docs/ENGINE.md`.
+
+## Status
+
+**Milestone 1 — engine core: done.** Setup, turns, attacks, weakness/resistance, status conditions, KOs and prizes,
+the choice model, ~all common DSL primitives, random agent, simulator, and an end-to-end test deck pair.
+Rare DSL nodes (`evolve` effect, `copyAttack`, `useAgain`, some `modify` stats) throw `notImplemented`.
+
+**Next:** the real card library (data -> DSL compiler, set/regulation filtering), special Energy / rule-box
+triggers (`onKnockedOut`, `onDamaged`, `wouldKO`), then a search AI (MCTS / determinized rollouts) on top of
+`legalActions` + `applyAction` + `observe`, and performance work (structural sharing instead of deep clones).
