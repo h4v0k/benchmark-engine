@@ -24,6 +24,7 @@ import { makeRng, next, shuffle, type Rng } from "../rng.js";
 import { canPay, providedEnergy } from "../rules.js";
 import { cloneState, inPlay, other, topDef, type GameState, type PlayerId, type PokemonInPlay } from "../state.js";
 import { greedyAgent } from "./greedy.js";
+import { mainLineEvolution, missing, tempoInfo, typesOf } from "./tempo.js";
 import type { Agent } from "./random.js";
 
 export interface SearchConfig {
@@ -43,7 +44,7 @@ export interface SearchConfig {
 }
 export const DEFAULT_SEARCH: SearchConfig = { determinizations: 6, iterations: 60, rolloutTurns: 6, cUct: 1.4, opponentModel: "greedy", maxBranch: 32 };
 /** Cheap preset for batch A/B runs. */
-export const FAST_SEARCH: SearchConfig = { ...DEFAULT_SEARCH, determinizations: 3, iterations: 20, rolloutTurns: 2 };
+export const FAST_SEARCH: SearchConfig = { ...DEFAULT_SEARCH, determinizations: 3, iterations: 40, rolloutTurns: 2 };
 /** Thorough preset (several times slower than fast). */
 export const STRONG_SEARCH: SearchConfig = { ...DEFAULT_SEARCH, determinizations: 8, iterations: 80, rolloutTurns: 4 };
 export const SEARCH_PRESETS = { fast: FAST_SEARCH, strong: STRONG_SEARCH, default: DEFAULT_SEARCH } as const;
@@ -78,6 +79,16 @@ function boardScore(s: GameState, pl: PlayerId): number {
     v += HW.evo * p.below.length; // evolution progress (Stage 1 = 1, Stage 2 = 2)
   }
   if (ps.active && cheapestShortfall(ps.active) === 0) v += 0.5;
+  // tempo: how close is the best "main attacker" line (highest potential damage) to its big attack: evolution stage reached and Energy matched.
+  // A horizon of a couple of turns cannot see the Stage 2 payoff by itself, so this puts the payoff into the leaf value.
+  let tempo = 0;
+  for (const [p, m] of tempoInfo(s, pl)) {
+    if (!m.tier1) continue;
+    const stage = m.stage > 0 ? Math.min(1, p.below.length / m.stage) : 1;
+    const energy = m.cost.length ? 1 - missing(m.cost, typesOf(p.energy)) / m.cost.length : 1;
+    tempo = Math.max(tempo, 0.5 * stage + 0.5 * energy);
+  }
+  v += HW.tempo * tempo;
   return v + Math.min(ps.bench.length, 4) * 0.1;
 }
 /** Fraction-of-HP damage on a side's Pokémon (the opponent's damaged board is progress for us). */
@@ -89,7 +100,7 @@ function damageTaken(s: GameState, pl: PlayerId): number {
 const deckRisk = (n: number): number => Math.max(0, 16 - n) * 0.08 + (n < 6 ? (6 - n) * 0.5 : 0);
 /** Heuristic probability that `me` wins from a non-terminal state; terminal states give exactly 1 / 0 / 0.5. */
 /** Heuristic weights (exported so experiments can tune them; defaults are the shipped values). */
-export const HW = { board: 0.35, damage: 0.35, hand: 0.04, deckDiff: 0.03, evo: 0.25, scale: 1.8 };
+export const HW = { board: 0.35, damage: 0.35, hand: 0.04, deckDiff: 0.03, evo: 0.25, tempo: 1.0, scale: 1.8 };
 export function heuristicValue(s: GameState, me: PlayerId): number {
   if (s.phase === "over") return s.winner === undefined ? 0.5 : s.winner === me ? 1 : 0;
   const opp = other(me), mine = s.players[me], theirs = s.players[opp];
@@ -282,6 +293,8 @@ export function searchAgent(config: Partial<SearchConfig> = {}): Agent {
     if (state.phase !== "main") return greedyAgent(state, rng);
     const acts = legalActions(state, pl);
     if (acts.length === 1) return acts[0]!;
+    const evo = mainLineEvolution(state, pl, acts); // evolving the main attacker's line is tempo the 2-turn horizon undervalues: not searched
+    if (evo) return evo;
     const ev = evaluateActions(state, pl, cfg, rng);
     return ev[bestIndex(ev)]!.action;
   };

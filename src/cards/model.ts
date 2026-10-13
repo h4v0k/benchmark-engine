@@ -55,6 +55,9 @@ const BY_IID = new Map<string, CardDef>();
 export function registerCards(defs: Iterable<CardDef>): void {
   for (const d of defs) { const old = REG.get(d.id); if (old && old !== d) BY_IID.clear(); REG.set(d.id, d); }
 }
+/** All registered defs (insertion order). */
+export const registrySize = (): number => REG.size;
+export const registeredDefs = (): IterableIterator<CardDef> => REG.values();
 export function getDef(id: string): CardDef {
   const d = REG.get(id);
   if (!d) throw new Error(`unknown card def: ${id}`);

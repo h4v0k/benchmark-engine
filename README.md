@@ -73,4 +73,4 @@ node scripts/bench.mjs 200                                                  # gr
 Speed: greedy-vs-greedy Dragapult vs N's Zoroark runs at about **100 games/s per core** (was about 30; best-of-8 runs of 80 games, 94 to 109),
 with games identical for a given seed: `src/test/golden.test.ts` replays 50 seeds against a committed fixture
 (`src/test/fixtures/golden-50.json`) and is a permanent regression guard for any engine change. If a rules or card change legitimately alters
-outcomes, regenerate the fixture in that same change and say so. What made it fast is in `docs/ENGINE.md` ("Performance").
+outcomes, regenerate the fixture in that same change and say so (golden-50 is a greedy-behaviour fixture too: it was regenerated on 2026-10-13 when the greedy pilot's tempo changed, engine unchanged; see `docs/EXPERIMENTS.md`, "Pilot tempo"). What made it fast is in `docs/ENGINE.md` ("Performance").

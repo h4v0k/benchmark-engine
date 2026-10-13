@@ -61,3 +61,35 @@ Spec JSON (decks are referenced by name from `src/cards/standard`: `dragapult`, 
 * Best-of-one, Standard rules as implemented; no sideboarding, no best-of-three, no clock.
 * An interval that includes 0 is not evidence of "no effect": check the games-needed figure.
 * Findings must carry: interval, games, field, date, and mechanism (the report does).
+
+## Pilot tempo (2026-10-13)
+
+`node scripts/tempo.mjs [nGreedy=200] [nSearch=60]` measures how fast the Dragapult ex player develops and attacks (own-turn numbers from the event
+stream) and counts legal-but-unused evolve / attach / attack options per own turn. Finding that triggered it: the A/B report had Dragapult ex first
+attacking on game turn ~16 (its own 8th turn). The engine was not the cause (`src/test/tempo.test.ts` plays the canonical Dreepy -> Drakloak ->
+Dragapult ex curve, own turns 1/2/3, with Phantom Dive legal on turn 3, from either seat). The pilot was:
+
+* Greedy kept a free-attacking Budew (or Munkidori) Active and the "retreat only if the Active cannot attack" rule never promoted the evolved
+  Dragapult ex; Energy went to whoever attacked soonest (often Munkidori / the Active) instead of the main attacker's line.
+* Search (`search:fast`) skipped evolutions 15-30% of own turns (22% on turn 2-3) because a 2-turn horizon does not see the Stage 2 payoff.
+
+Fixes (all in the pilots; no engine rule changed): greedy attaches Energy that brings the main attacker's big attack closer to its line first (the
+Pokémon being evolved included) and retreats to a benched Pokémon that hits clearly harder (`src/agents/tempo.ts`); search gets a tempo term in the leaf
+heuristic (`HW.tempo`) and plays an available main-line evolution without searching. `FAST_SEARCH` iterations 20 -> 40 (see below).
+
+| Dragapult ex player, own turn, median [p25-p75] | greedy before | greedy after | search:fast before | search:fast after |
+|---|---|---|---|---|
+| first Drakloak | 2 | 2 | 6 | 3 |
+| first Dragapult ex | 4 | 4 | 7 | 5 |
+| first Dragapult ex attack | 7 [3-12] | 5 [3-10] | 8 [6-13] | 5 [4-9] |
+| first KO (game turn) | 11 | 9 | 12 | 8 |
+
+Side effects to keep in mind: the stronger greedy shifts the Dragapult-vs-Zoroark matchup (greedy-vs-greedy Dragapult win rate 70% -> 87%, golden-50
+regenerated for this reason), so earlier A/B numbers are not comparable with new ones. Search must beat a stronger greedy, so `FAST_SEARCH` now uses
+40 iterations per world (20 gave about 80% against the new greedy, 40 gives 87%) at about half the games/s (0.95 -> 0.45-0.6).
+
+Known remaining gap vs human play: median first Dragapult ex attack is own turn 5, a human gets there on turn 3-4. Mean Energy on the Dragapult line
+by own turn 3 is only 1.1: the list has 8 Basic Energy (2 of them Darkness), so the second Energy (R+P for Phantom Dive) usually arrives late; the pilot
+does not mulligan-evaluate / dig for Energy (Crispin, Rosa's Encouragement, Ultra Ball for Energy) with that goal, does not hold Dreepy back from the
+Active slot (it is often KO'd early; 7.5% of games never reach Dragapult ex), and N's Zoroark ex's pilot often repeats a zero-damage Night Joker for many
+turns (no copy source powered), which flatters Dragapult in the matchup. Tempo-based findings should still be read with a pilot-skill caveat.

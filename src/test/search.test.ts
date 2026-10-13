@@ -90,7 +90,7 @@ function scramble(s: GameState, opp: PlayerId, seed: number, pooled: boolean): G
 test("hidden information: permuting the opponent's hidden cards does not change the search", () => {
   const cfg: Partial<SearchConfig> = { determinizations: 3, iterations: 10, rolloutTurns: 2 };
   // walk a greedy-vs-greedy game and probe the searcher's decisions at several points (no open choice)
-  let s = createGame(D, Z, 21);
+  let s = createGame(D, Z, 24); // a greedy-vs-greedy game long enough to reach the last probe turn (re-picked when greedy got faster)
   let guard = 0, probes = 0;
   const targets = [3, 6, 9, 12, 15, 18];
   while (s.phase !== "over" && probes < targets.length && guard++ < 5000) {
