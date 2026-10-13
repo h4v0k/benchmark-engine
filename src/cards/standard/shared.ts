@@ -37,10 +37,8 @@ export const MUNKIDORI = pkmn("sv6", "TWM", "95", "H", {
     name: "Adrena-Brain", limit: "oncePerTurn", text: "Once during your turn, if this Pokémon has any Darkness Energy attached, you may move up to 3 damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon.",
     trigger: { t: "ability", name: "Adrena-Brain", limit: "oncePerTurn", requires: { c: "has", player: "self", zone: "attached", filter: { type: ["D"], supertype: "energy" } } },
     requires: { c: "has", player: "self", zone: "attached", filter: { type: ["D"], supertype: "energy" } },
-    effect: { e: "optional", do: { e: "bind", as: "src", sel: pickSelf("play", { damaged: true }), then: { e: "bind", as: "dst", sel: pickOpp("play"), then: { e: "seq", steps: [
-      { e: "counters", to: { s: "ref", id: "src" }, n: { k: "upTo", n: 3 }, remove: true },
-      { e: "counters", to: { s: "ref", id: "dst" }, n: { k: "cardsDiscardedThisWay" } }, // NOTE: "same number removed"; see M2-GAPS (needs a 'countersMoved' amount)
-    ] } } } },
+    effect: { e: "optional", do: { e: "bind", as: "src", sel: pickSelf("play", { damaged: true }), then: { e: "bind", as: "dst", sel: pickOpp("play"),
+      then: { e: "moveCounters", from: { s: "ref", id: "src" }, to: { s: "ref", id: "dst" }, n: { k: "upTo", n: 3 } } } } },
   }],
   attacks: [atk("Mind Bend", ["P", "C"], 60, "Your opponent's Active Pokémon is now Confused.", { e: "status", to: DEF, status: "confused" })],
 });
@@ -57,10 +55,10 @@ export const MEOWTH_EX = pkmn("me3", "POR", "62", "J", {
   text: "Last-Ditch Catch: Once during your turn, when you play this Pokémon from your hand onto your Bench, you may use this Ability. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck. You can't use more than 1 Ability that has \"Last-Ditch\" in its name each turn. | Tuck Tail [CCC] 60: Put this Pokémon and all attached cards into your hand.",
   rules: [EX_RULE, {
     trigger: { t: "onPlayToBench", fromHand: true }, text: "Last-Ditch Catch (see text); name-limited: only 1 'Last-Ditch' Ability per turn",
-    effect: { e: "optional", do: { e: "seq", steps: [
-      { e: "tag", key: "last-ditch-used", duration: "thisTurn" },
+    effect: { e: "if", cond: { c: "not", of: { c: "tagged", key: "last-ditch" } }, then: { e: "optional", do: { e: "seq", steps: [
+      { e: "tag", key: "last-ditch", duration: "thisTurn" },
       { e: "search", player: "self", to: "hand", shuffle: true, sel: { player: "self", zone: "deck", filter: { supertype: "trainer", subtype: ["supporter"] }, count: 1, reveal: true } },
-    ] } },
+    ] } } },
   }],
   attacks: [atk("Tuck Tail", ["C", "C", "C"], 60, "Put this Pokémon and all attached cards into your hand.", { e: "returnToHand", who: SELF, withAttached: true })],
 });

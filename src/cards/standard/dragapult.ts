@@ -73,12 +73,8 @@ export const FEZANDIPITI_EX = pkmn("me2pt5", "ASC", "142", "H", {
 });
 
 // ---- Trainers only in this deck ----
-export const CRISPIN = trainer("sv7", "SCR", "133", "H", "Crispin", "Supporter", [play("supporter", { e: "seq", steps: [
-  // GAP: "different types" + "put 1 in hand, attach the other": approximated as search 2 -> hand, then attach 1 from hand. See M2-GAPS.
-  { e: "search", player: "self", to: "hand", shuffle: false, sel: { player: "self", zone: "deck", filter: { subtype: ["basic-energy"] }, count: { k: "upTo", n: 2 }, reveal: true } },
-  { e: "attachEnergy", sel: { player: "self", zone: "hand", filter: { subtype: ["basic-energy"] }, count: 1, chooser: "self" }, to: pickSelf("play") },
-  { e: "shuffle", player: "self", zone: "deck" },
-] })], "Search your deck for up to 2 Basic Energy cards of different types, reveal them, and put 1 of them into your hand. Attach the other to 1 of your Pokémon. Then, shuffle your deck.");
+export const CRISPIN = trainer("sv7", "SCR", "133", "H", "Crispin", "Supporter", [play("supporter",
+  { e: "searchSplit", player: "self", filter: { subtype: ["basic-energy"] }, upTo: 2, distinct: "type", a: { to: "hand" }, b: { attachTo: pickSelf("play") }, shuffle: true })], "Search your deck for up to 2 Basic Energy cards of different types, reveal them, and put 1 of them into your hand. Attach the other to 1 of your Pokémon. Then, shuffle your deck.");
 
 const morePrizes: Condition = { c: "cmp", a: { k: "prizesLeft", player: "self" }, op: ">", b: { k: "prizesLeft", player: "opp" } };
 export const ROSAS_ENCOURAGEMENT = trainer("me3", "POR", "84", "J", "Rosa's Encouragement", "Supporter", [play("supporter", {

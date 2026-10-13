@@ -68,7 +68,7 @@ export const YVELTAL = pkmn("me1", "MEG", "88", "I", {
 // ---- Trainers only in this deck ----
 export const BLACK_BELTS_TRAINING = trainer("sv9", "JTG", "143", "H", "Black Belt's Training", "Supporter", [play("supporter", {
   e: "modify", stat: "damageDealt", who: allOf("self", "play"), value: 40, duration: "thisTurn", beforeWR: true,
-  against: pickOpp("active", { subtype: ["ex"] }), // GAP: conditional-on-target-filter is expressed through `against` selector; verify semantics
+  againstFilter: { subtype: ["ex"] }, // evaluated against the Defending Pokémon at damage time
 })], "During this turn, attacks used by your Pokémon do 40 more damage to your opponent's Active Pokémon ex (before applying Weakness and Resistance).");
 
 export const CYRANO = trainer("sv8", "SSP", "170", "H", "Cyrano", "Supporter", [play("supporter", {
@@ -83,7 +83,7 @@ export const NS_PP_UP = trainer("sv9", "JTG", "153", "I", "N's PP Up", "Item", [
 
 const oppPrizesLow: Condition = { c: "cmp", a: { k: "prizesLeft", player: "opp" }, op: "<=", b: 3 };
 export const SPECIAL_RED_CARD = trainer("me4", "CRI", "82", "J", "Special Red Card", "Item", [play("item", { e: "seq", steps: [
-  { e: "move", sel: { player: "opp", zone: "hand", count: { k: "all" } }, to: "deck", position: "bottom" },
+  { e: "move", sel: { player: "opp", zone: "hand", count: { k: "all" } }, to: "deck", position: "bottom", shuffleFirst: true },
   { e: "if", cond: { c: "didPrev" }, then: { e: "draw", player: "opp", n: 3 } },
 ] }, { requires: oppPrizesLow })], "You can use this card only if your opponent has 3 or fewer Prize cards remaining. Your opponent shuffles their hand and puts it on the bottom of their deck. If they put any cards on the bottom of their deck in this way, they draw 3 cards.");
 

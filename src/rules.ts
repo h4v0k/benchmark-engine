@@ -1,6 +1,7 @@
 // Derived stats & small rule helpers shared by the interpreter, legal-action generator and game loop.
 import type { Effect, EnergyType } from "./dsl/types.js";
-import { defOf, getDef, defIdOf, type CardDef } from "./cards/model.js";
+import { defOf, matchesFilter, type CardDef } from "./cards/model.js";
+import { staticStat } from "./statics.js";
 import { markerSum, topDef, type GameState, type PlayerId, type PokemonInPlay } from "./state.js";
 
 /** Sum of numeric `static` modify entries on a card for a stat (Tools, Stadiums). */
@@ -15,12 +16,11 @@ export function staticModifiers(def: CardDef | undefined, stat: string): number 
   return sum;
 }
 export const toolDef = (p: PokemonInPlay): CardDef | undefined => (p.tool ? defOf(p.tool) : undefined);
-export function maxHp(_s: GameState, p: PokemonInPlay): number {
-  return (topDef(p).hp ?? 0) + staticModifiers(toolDef(p), "hp") + markerSum(p.markers, "mod:hp");
+export function maxHp(s: GameState, p: PokemonInPlay): number {
+  return (topDef(p).hp ?? 0) + staticStat(s, p, "hp") + markerSum(p.markers, "mod:hp");
 }
 export function retreatCostOf(s: GameState, p: PokemonInPlay): number {
-  const stad = s.stadium ? getDef(defIdOf(s.stadium.iid)) : undefined;
-  const c = (topDef(p).retreatCost ?? 0) + staticModifiers(toolDef(p), "retreat") + staticModifiers(stad, "retreat") + markerSum(p.markers, "mod:retreat");
+  const c = (topDef(p).retreatCost ?? 0) + staticStat(s, p, "retreat") + markerSum(p.markers, "mod:retreat");
   return Math.max(0, c);
 }
 /** Energy units provided by attached Energy (each card contributes its `types`). */
@@ -41,8 +41,15 @@ export function canPay(cost: EnergyType[], provided: EnergyType[]): boolean {
   }
   return pool.length >= colorless;
 }
-export function attackerBonus(p: PokemonInPlay): number {
-  return staticModifiers(toolDef(p), "damageDealt") + markerSum(p.markers, "mod:damageDealt");
+/** Extra damage dealt by `p` (static + markers). `defender` is needed to evaluate conditional (`againstFilter`) markers. */
+export function attackerBonus(s: GameState, p: PokemonInPlay, defender?: PokemonInPlay): number {
+  let sum = staticStat(s, p, "damageDealt");
+  for (const m of p.markers) {
+    if (m.key !== "mod:damageDealt") continue;
+    if (m.againstFilter && !(defender && matchesFilter(topDef(defender), m.againstFilter, { damaged: defender.damage > 0, hasEnergy: defender.energy.length > 0, hasTool: !!defender.tool }))) continue;
+    sum += m.value ?? 0;
+  }
+  return sum;
 }
 export function weaknessResistance(attacker: PokemonInPlay | undefined, target: PokemonInPlay, raw: number): number {
   const at = attacker ? topDef(attacker).types ?? [] : [];

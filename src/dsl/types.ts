@@ -51,7 +51,8 @@ export type Condition =
   | { c: "didPrev" }                                             // "if you do" / "if you drew any cards"
   | { c: "koLastTurn"; player: PlayerRef }                       // "were KO'd during opp's last turn"
   | { c: "stadiumInPlay"; name?: string } | { c: "firstTurn" } | { c: "lastCardInHand" }
-  | { c: "inPlayActive" } | { c: "playedFromHandThisTurn" };
+  | { c: "inPlayActive" } | { c: "playedFromHandThisTurn" }
+  | { c: "tagged"; key: string };                                // a `tag` with this key was set for the current player (e.g. "Last-Ditch" used this turn)
 
 // ---- Effects (primitives) --------------------------------------------------
 export type Effect =
@@ -75,7 +76,11 @@ export type Effect =
   | { e: "status"; to: Selector; status: Status }
   | { e: "clearStatus"; to: Selector }
   // card movement (generic) + sugar
-  | { e: "move"; sel: CardSel; to: Zone; dest?: Selector; position?: "top"|"bottom"|"shuffle"; order?: "any" }
+  | { e: "move"; sel: CardSel; to: Zone; dest?: Selector; position?: "top"|"bottom"|"shuffle"; order?: "any"; shuffleFirst?: boolean }
+  // move N damage counters (n may be upTo) from the first Pokémon `from` selects to the first `to` selects; the number placed equals the number removed
+  | { e: "moveCounters"; from: Selector; to: Selector; n: Amount }
+  // search a zone for up to `upTo` cards matching `filter` (with `distinct` constraint between them); one goes to hand (player picks which), the other is attached to `b.attachTo`
+  | { e: "searchSplit"; player: PlayerRef; zone?: Zone; filter: CardFilter; upTo: number; distinct?: "type" | "name"; a: { to: "hand" }; b: { attachTo: Selector }; shuffle?: boolean }
   | { e: "draw"; player: PlayerRef; n: Amount; untilHand?: Amount }
   | { e: "search"; player: PlayerRef; sel: CardSel; to: Zone; dest?: Selector; shuffle?: boolean }
   | { e: "shuffle"; player: PlayerRef; zone: Zone }
@@ -93,7 +98,7 @@ export type Effect =
   | { e: "lock"; what: Lock; duration: Duration }
   | { e: "prevent"; from: "damage" | "effects" | "both"; who: Selector; sources?: CardFilter; duration: Duration }
   | { e: "modify"; stat: "hp" | "retreat" | "weakness" | "damageDealt" | "damageTaken" | "typeProvided" | "attackCost" | "toolSlots"; who: Selector;
-      value: Amount | EnergyType; against?: Selector; duration: Duration; beforeWR?: boolean }
+      value: Amount | EnergyType; against?: Selector; /** damageDealt only: bonus applies only if the Defending Pokémon matches this filter at damage time */ againstFilter?: CardFilter; duration: Duration; beforeWR?: boolean }
   | { e: "copyAttack"; from: Selector; filter?: CardFilter; viaDiscardTop?: boolean }
   | { e: "useAgain" }
   | { e: "forEach"; over: Selector; bind: string; do: Effect }     // "for each of those Pokémon, ..." / "choose 1 ... 6 times"
