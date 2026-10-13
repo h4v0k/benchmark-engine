@@ -522,6 +522,26 @@ test("N's Zoroark ex Night Joker: uses a Benched N's Pokémon's attack without i
   assert.equal(w.players[1].active!.damage, 0);
 });
 
+test("Night Joker's copy source excludes a benched Zoroark ex whose only attack is Night Joker", () => {
+  const s = mainState();
+  setActive(s, 0, id("N's Zoroark ex"), { energy: [D, D] });
+  const other = addBench(s, 0, id("N's Zoroark ex")); const resh = addBench(s, 0, id("N's Reshiram")); setActive(s, 1, "dummy");
+  const n = attack(s, 0);
+  // N's Reshiram is the only valid source: no Pokémon choice, straight to choosing among its attacks
+  assert.equal(n.pendingChoice!.kind, "option");
+  assert.deepEqual(n.pendingChoice!.options, ["0", "1"]);
+  assert.ok(n.pendingChoice!.prompt.includes("N's Reshiram"));
+  assert.ok(other.iid !== resh.iid);
+  // with a second copyable source the Pokémon choice appears, and still never lists the other Zoroark ex
+  const t = mainState();
+  setActive(t, 0, id("N's Zoroark ex"), { energy: [D, D] });
+  const z2 = addBench(t, 0, id("N's Zoroark ex")); const r2 = addBench(t, 0, id("N's Reshiram")); const k2 = addBench(t, 0, id("N's Zekrom")); setActive(t, 1, "dummy");
+  const q = attack(t, 0);
+  assert.equal(q.pendingChoice!.kind, "pokemon");
+  assert.deepEqual([...q.pendingChoice!.options].sort(), [r2.iid, k2.iid].sort());
+  assert.ok(!q.pendingChoice!.options.includes(z2.iid));
+});
+
 test("N's Zekrom: Shred ignores effects on the Defending Pokémon; Rampaging Thunder 250 then can't attack next turn", () => {
   const mkS = () => {
     const s = mainState(); setActive(s, 0, id("N's Zekrom"), { energy: [R, L, L, D] });

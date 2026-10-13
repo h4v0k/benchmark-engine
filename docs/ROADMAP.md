@@ -36,9 +36,9 @@ discovery; best-of-3 and clock modeling.
 
 ## M3 — The proof
 
-1. **Structured event stream.** Every draw / play / attach / evolve / ability / attack /
+1. **Structured event stream** *(done, M3a: `src/events.ts`)*. Every draw / play / attach / evolve / ability / attack /
    KO / prize / switch as typed data. All analytics and mechanism stats read this.
-2. **Speed pass.** Known hotspots: static-effect sources rescanning the board on every
+2. **Speed pass** *(done, M3a: ~30 → ~100 games/s, golden-50 guard)*. Known hotspots: static-effect sources rescanning the board on every
    query; clone-on-write + GC. Target ≥3× (28 → 100+ games/s on 2 cores), then more.
 3. **Search pilot.** Determinized MCTS over `legalActions()`: sample what the opponent could
    hold (consistent with `observe()`), search, pick the best line. Greedy as the rollout

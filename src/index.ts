@@ -7,3 +7,4 @@ export * from "./sim.js";
 export { randomAgent, makeRandomAgent, type Agent } from "./agents/random.js";
 export { greedyAgent } from "./agents/greedy.js";
 export type * from "./dsl/types.js";
+export * from "./events.js";

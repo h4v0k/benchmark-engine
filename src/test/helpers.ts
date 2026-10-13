@@ -46,5 +46,5 @@ export function give(s: GameState, pl: PlayerId, defId: string): string {
   return c;
 }
 export const acts = (s: GameState, pl: PlayerId, type: Action["type"]) => legalActions(s, pl).filter((a) => a.type === type);
-export const coins = (s: GameState): string[] => s.log.filter((l) => / coin [HT]$/.test(l)).map((l) => l.slice(-1));
+export const coins = (s: GameState): string[] => s.events.flatMap((e) => (e.type === "coin" ? [e.heads ? "H" : "T"] : []));
 export { applyAction, legalActions };
