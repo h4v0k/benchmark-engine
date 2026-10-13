@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// Usage: node scripts/sim.mjs <deckA> <deckB> [n=100] [seed=1] [maxTurns=200] [--jsonl <path>] [--greedy]   (run `npm run build` first)
+// Usage: node scripts/sim.mjs <deckA> <deckB> [n=100] [seed=1] [maxTurns=200] [--jsonl <path>] [--greedy] [--agent <spec>]   (run `npm run build` first)
 // --jsonl <path>  write one JSON line per game {seed, decks, winner, reason, turns, events} for offline analytics
 // --greedy        use the greedy agent for both players (default: random agents)
+// --agent <spec>  greedy | random | search:fast | search:strong; "x,y" = deck A plays x, deck B plays y (overrides --greedy)
 // Decks: dragapult | zoroark (aliases: DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK). Alternates which deck is player 0 each game.
 import { playGame, randomAgent, greedyAgent, exportGamesJsonl, KEY_EFFECTS } from "../dist/index.js";
+import { parseAgentPair } from "./agent-spec.mjs";
 import { DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK } from "../dist/cards/standard/index.js";
 
 const DECKS = { dragapult: DRAGAPULT_EX_DECK, zoroark: NS_ZOROARK_EX_DECK, DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK };
@@ -11,9 +13,10 @@ const argv = process.argv.slice(2);
 const takeFlag = (name) => { const i = argv.indexOf(name); if (i < 0) return false; argv.splice(i, 1); return true; };
 const takeOpt = (name) => { const i = argv.indexOf(name); if (i < 0) return undefined; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const jsonlPath = takeOpt("--jsonl");
-const agent = takeFlag("--greedy") ? greedyAgent : randomAgent;
+const agentSpec = takeOpt("--agent");
+const [agentA, agentB] = agentSpec ? parseAgentPair(agentSpec) : takeFlag("--greedy") ? [greedyAgent, greedyAgent] : [randomAgent, randomAgent];
 const [nameA, nameB, nArg, seedArg, mtArg] = argv;
-if (!DECKS[nameA] || !DECKS[nameB]) { console.error("usage: sim.mjs <dragapult|zoroark> <dragapult|zoroark> [n] [seed] [maxTurns] [--jsonl path] [--greedy]"); process.exit(2); }
+if (!DECKS[nameA] || !DECKS[nameB]) { console.error("usage: sim.mjs <dragapult|zoroark> <dragapult|zoroark> [n] [seed] [maxTurns] [--jsonl path] [--greedy] [--agent spec]"); process.exit(2); }
 const n = Number(nArg ?? 100), seed0 = Number(seedArg ?? 1), maxTurns = Number(mtArg ?? 200);
 
 export function runSim(nameA, nameB, n, seed0, maxTurns) {
@@ -23,7 +26,7 @@ export function runSim(nameA, nameB, n, seed0, maxTurns) {
     const seed = seed0 + i, aFirst = i % 2 === 0;
     const [d0, d1] = aFirst ? [DECKS[nameA], DECKS[nameB]] : [DECKS[nameB], DECKS[nameA]];
     let r;
-    try { r = playGame(d0, d1, seed, agent, agent, maxTurns); }
+    try { r = aFirst ? playGame(d0, d1, seed, agentA, agentB, maxTurns) : playGame(d0, d1, seed, agentB, agentA, maxTurns); }
     catch (e) { out.errors.push({ seed, msg: String(e?.stack ?? e).split("\n").slice(0, 4).join(" | ") }); continue; }
     out.turns += r.turns;
     out.reasons[r.reason] = (out.reasons[r.reason] ?? 0) + 1;
