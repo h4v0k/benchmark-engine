@@ -66,7 +66,7 @@ Everything that can ask lives inside one "origin action" — including the post-
 turn's start — so a mid-turn promotion or a Checkup-time decision uses the same mechanism. Callers may also pre-supply answers:
 `playSupporter`/`playItem`/`useAbility`/`attack` accept `choices: string[][]` (one pick-list per decision, in order).
 `mulliganDraw` is the only non-replayed choice (setup phase). Choice kinds: `pokemon` (options are Pokémon ids), `cards`,
-`option` (index of a `choose` effect branch), `yesno`, `mulliganDraw` (options `"0".."n"`).
+`option` (index of a `choose` effect branch, an attack index, or a number), `yesno`, `mulliganDraw` (options `"0".."n"`), `distribute` (see below).
 
 ### Interpreter coverage
 Implemented: `seq if optional repeat choose bind forEach cost`, `damage damageMod selfDamage heal counters knockOut`, `flip status
@@ -77,9 +77,45 @@ resistance, then prevention markers. `noop` inside an attack cancels its damage.
 Persistent effects are *markers* with expiry (`thisTurn`, `oppNextTurn`, `yourNextTurn`, `whileInPlay`) on Pokémon or players.
 Tools and Stadiums contribute through `static` entries (`modify hp|retreat|damageDealt|damageTaken`).
 
-`notImplemented`: effect nodes `evolve`, `copyAttack`, `useAgain`; `modify` stats `weakness|typeProvided|attackCost|toolSlots`;
-triggers `onKnockedOut/onDamaged/wouldKO/onEvolve/onPlayToBench/endOfTurn` (parsed but never fired); special-Energy `attach`
-effects. These are reached only by cards that use them, and throw a descriptive error rather than silently misplaying.
+`notImplemented`: effect nodes `evolve`, `useAgain`; `modify` stats `weakness|typeProvided|attackCost|toolSlots`; triggers
+`wouldKO`/`betweenTurns` and special-Energy `attach` effects. These throw a descriptive error when reached. Milestone 2 features follow.
+
+### M2 features (part 2a)
+- **copyAttack** (`{e:"copyAttack", from, filter?}`): `from` selects the source Pokémon (a `pick` asks the player), then the player
+  picks one of its attacks (`option` choice, auto if only one). The copied attack's printed damage replaces the pool and its effect runs
+  in the *copier's* context (copier's type for weakness, copier's bonuses), without checking/paying the copied cost. Attacks that
+  themselves contain `copyAttack` are not offered, and `ctx.copying` makes a nested copy a no-op (recursion guard).
+- **Triggers** (all run through the normal choice/replay model; helpers `fireOn*` in interpreter.ts): `onPlayToBench{fromHand:true}`
+  fires on a Basic played from hand (silenced by Ability locks); `fromHand:false` entries fire for effect placements (`putOnBench`,
+  `search`/`move` to bench). `onPutOnBench{whose,filter}` fires on Pokémon, attached Tool and Stadium rules for any bench placement
+  made during the placing player's own turn and supplies ref `benched`. `onDamaged` fires after an opponent's attack deals > 0 to a
+  Pokémon (`active`: only while Active; `evenIfKO`) and supplies ref `attacker`. `onKnockedOut{byAttack}` fires in `resolveKOs`
+  before removal (a KO counts as "by attack" if the Pokémon was lethally damaged right after an attack and the attacker is the
+  opponent); supplies `attacker`. `onEvolve` fires after evolving from hand. `endOfTurn{whose}` fires when the active player's turn ends
+  (before markers expire and before Checkup); `whose` is relative to the rule owner. Tools' and Stadiums' rules are collected too.
+- **Static effects** (`src/statics.ts`): never cached. `staticStat` (numeric `modify` and `retreatCost` deltas, resolved over the
+  entry's selector), `staticPreventsDamage` (`prevent from damage|both`, applies to damage done *by attacks* only, so counters,
+  poison, burn and confusion are unaffected) and `abilityLocked` (`lock ability{filter}` plus the temporary global `noAbility`
+  marker) re-scan Pokémon (with their `while` condition), attached Tools and the Stadium on every call. A Stadium's `self` /
+  `attached-to` modify applies to every Pokémon in play. Used by `maxHp`, `retreatCostOf`, `attackerBonus`, `applyDamage`, `legalActions`.
+- **Trainer `requires` / `cost`**: `legalActions` hides a Trainer unless `play.requires` holds and any cost can be paid
+  (`play.cost`, or a top-level `{e:"cost"}` wrapper: discards are counted, excluding the played card itself). `play.cost` is run via
+  the choice model before the effect. `Player.lastKOTurn` records "a Pokémon of mine was Knocked Out" for `koLastTurn`.
+- **Abilities**: `trigger.costToUse` is checked for payability in `legalActions` and run first when used.
+  `oncePerNamePerTurn` (on `trigger.limit` or `limit`) records the name in `flags.abilityNamesUsed` (reset each turn) so only one
+  Pokémon may use an ability of that name per turn; `oncePerTurn` stays per Pokémon. The "Last-Ditch" family uses the new
+  `tag` (player-level marker) + `{c:"tagged"}` condition.
+- **validateDeck**: also rejects more than one ACE SPEC (`AceSpec` subtype).
+- **New nodes**: `moveCounters{from,to,n}` (n may be `upTo`; the count is a choice capped by counters present, placed = removed);
+  `searchSplit{filter,upTo,distinct,a,b}` (sequential picks that obey the `distinct` type/name constraint, then one to hand and the
+  other attached to `b.attachTo`); `modify.againstFilter` (damageDealt marker that only applies if the Defending Pokémon matches at
+  damage time); `move.shuffleFirst`; `move` of in-play Pokémon (`zone: play|active|bench` with `from`) moves the whole stack
+  (Pokémon, evolutions, Energy, Tool) and clears the slot.
+- **`damage{effects:false}`**: the attack's damage skips defender markers (`preventDamage`, `mod:damageTaken`) and static
+  prevention/modifiers; weakness/resistance still apply.
+- **`distribute` choice** (counters with `distribute:true` over several targets): options are target ids, `min = max = N`, each pick
+  is `"<id>=<count>"` (counts >= 1, total = N, ids unique). `legalActions` enumerates all compositions (cap 512); `randomAgent`
+  assigns each counter uniformly at random.
 
 ### Other design decisions
 - Damage is stored in HP points (multiples of 10 = counters). `turn` is a global counter (turn 1 = first player's first turn).

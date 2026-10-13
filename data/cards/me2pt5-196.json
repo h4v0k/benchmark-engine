@@ -1,0 +1,19 @@
+{
+  "id": "me2pt5-196",
+  "name": "Night Stretcher",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "Put a Pokémon or a Basic Energy card from your discard pile into your hand.",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "H",
+  "number": "196",
+  "rarity": "Common",
+  "set": {
+    "id": "me2pt5",
+    "ptcgoCode": "ASC"
+  }
+}

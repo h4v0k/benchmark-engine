@@ -1,0 +1,47 @@
+{
+  "id": "sv9-116",
+  "name": "N's Reshiram",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "130",
+  "types": [
+    "Dragon"
+  ],
+  "attacks": [
+    {
+      "name": "Powerful Rage",
+      "cost": [
+        "Fire",
+        "Lightning"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "20×",
+      "text": "This attack does 20 damage for each damage counter on this Pokémon."
+    },
+    {
+      "name": "Virtuous Flame",
+      "cost": [
+        "Fire",
+        "Fire",
+        "Lightning",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 4,
+      "damage": "170",
+      "text": ""
+    }
+  ],
+  "retreatCost": [
+    "Colorless",
+    "Colorless"
+  ],
+  "regulationMark": "I",
+  "number": "116",
+  "rarity": "Rare",
+  "set": {
+    "id": "sv9",
+    "ptcgoCode": "JTG"
+  }
+}

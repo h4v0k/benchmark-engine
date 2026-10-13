@@ -1,0 +1,19 @@
+{
+  "id": "me3-71",
+  "name": "Crushing Hammer",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "Flip a coin. If heads, discard an Energy from 1 of your opponent's Pokémon.",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "J",
+  "number": "71",
+  "rarity": "Common",
+  "set": {
+    "id": "me3",
+    "ptcgoCode": "POR"
+  }
+}

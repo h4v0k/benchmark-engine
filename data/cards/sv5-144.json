@@ -1,0 +1,19 @@
+{
+  "id": "sv5-144",
+  "name": "Buddy-Buddy Poffin",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "Search your deck for up to 2 Basic Pokémon with 70 HP or less and put them onto your Bench. Then, shuffle your deck.",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "H",
+  "number": "144",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "sv5",
+    "ptcgoCode": "TEF"
+  }
+}

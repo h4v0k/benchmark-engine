@@ -1,6 +1,7 @@
-import type { Effect } from "./dsl/types.js";
-import { defIdOf, defOf, hasSub, isBasicPokemon, isEnergy, isPokemon, type CardDef } from "./cards/model.js";
-import { evalCond, newCtx, type Run } from "./interpreter.js";
+import type { Condition, Effect } from "./dsl/types.js";
+import { defIdOf, defOf, hasSub, isBasicPokemon, isEnergy, isPokemon, matchesFilter, type AbilityDef, type CardDef } from "./cards/model.js";
+import { countRange, evalCond, newCtx, pickCandidates, pokemonFacts, type Run } from "./interpreter.js";
+import { abilityLocked } from "./statics.js";
 import { canPay, isFirstTurnOfGame, providedEnergy, retreatCostOf } from "./rules.js";
 import { cloneState, hasMarker, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "./state.js";
 
@@ -35,6 +36,16 @@ export function decider(s: GameState): PlayerId | null {
   }
 }
 
+function distributions(options: string[], total: number, cap = 512): string[][] {
+  const out: string[][] = [];
+  const rec = (i: number, left: number, cur: string[]) => {
+    if (out.length >= cap) return;
+    if (i === options.length - 1) { out.push(left > 0 ? [...cur, `${options[i]}=${left}`] : [...cur]); return; }
+    for (let k = left; k >= 0; k--) rec(i + 1, left - k, k > 0 ? [...cur, `${options[i]}=${k}`] : cur);
+  };
+  if (options.length) rec(0, total, []);
+  return out;
+}
 function combos(options: string[], lo: number, hi: number, sig: (id: string) => string, cap = 256): string[][] {
   const out: string[][] = [];
   const seen = new Set<string>();
@@ -52,6 +63,7 @@ function combos(options: string[], lo: number, hi: number, sig: (id: string) => 
   return out;
 }
 export function chooseActions(pc: PendingChoice, dedupe = true): Action[] {
+  if (pc.kind === "distribute") return distributions(pc.options, pc.max).map((picks) => ({ type: "choose" as const, picks }));
   const sig = pc.kind === "cards" && dedupe ? defIdOf : (x: string) => x;
   return combos(pc.options, pc.min, pc.max, sig).map((picks) => ({ type: "choose" as const, picks }));
 }
@@ -59,6 +71,12 @@ export function chooseActions(pc: PendingChoice, dedupe = true): Action[] {
 /** Effects whose top-level `switch` can't resolve (no Benched Pokémon) make a Trainer unplayable. */
 function effectUsable(s: GameState, pl: PlayerId, e: Effect): boolean {
   if (e.e === "seq") return e.steps.every((x) => effectUsable(s, pl, x));
+  if (e.e === "optional") return effectUsable(s, pl, e.do);
+  if (e.e === "bind") { // "choose 1 of your ..." with no candidate: the effect can do nothing, so it can't be used
+    if (e.sel.s === "pick" && e.sel.mode !== "all" && countRange(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel.count).min >= 1
+      && pickCandidates(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel).length === 0) return false;
+    return effectUsable(s, pl, e.then);
+  }
   if (e.e === "switch") {
     const target = e.player === "opp" ? other(pl) : e.player === "active-player" ? s.activePlayer : pl;
     const ps = s.players[target];
@@ -66,7 +84,27 @@ function effectUsable(s: GameState, pl: PlayerId, e: Effect): boolean {
   }
   return true;
 }
-const playEffect = (d: CardDef) => d.rules?.find((r) => r.trigger.t === "play")?.effect;
+const playEntry = (d: CardDef) => d.rules?.find((r) => r.trigger.t === "play");
+const playEffect = (d: CardDef) => playEntry(d)?.effect;
+
+/** Can the cost part of `e` (a `cost` wrapper's `pay`, or a bare cost effect) be paid? Currently checks discards (hand / any list zone). */
+export function costPayable(s: GameState, pl: PlayerId, e: Effect, playedCardInHand: boolean): boolean {
+  switch (e.e) {
+    case "seq": return e.steps.every((x) => costPayable(s, pl, x, playedCardInHand));
+    case "cost": return costPayable(s, pl, e.pay, playedCardInHand);
+    case "discard": {
+      const z = e.sel.zone;
+      if (z !== "hand" && z !== "deck" && z !== "discard") return true;
+      const owners: PlayerId[] = e.sel.player === "opp" ? [other(pl)] : e.sel.player === "both" ? [0, 1] : [pl];
+      const need = Math.min(countRange(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel.count).min, 1e9);
+      const have = owners.reduce<number>((n, o) => n + s.players[o][z].filter((c) => matchesFilter(defOf(c), e.sel.filter)).length - (z === "hand" && o === pl && playedCardInHand ? 1 : 0), 0);
+      return need === Infinity || have >= need;
+    }
+    default: return true;
+  }
+}
+const nameLimited = (ab: AbilityDef): boolean => ab.limit === "oncePerNamePerTurn" || (ab.trigger?.t === "ability" && ab.trigger.limit === "oncePerNamePerTurn");
+export const abilityIsNameLimited = nameLimited;
 
 export function canAttackNow(s: GameState, pl: PlayerId): boolean {
   const a = s.players[pl].active;
@@ -84,7 +122,16 @@ export function canRetreatNow(s: GameState, pl: PlayerId): boolean {
 }
 
 /** All legal actions for `player` at the current decision point. Identical cards are deduped (first copy). */
-export function legalActions(s: GameState, player: PlayerId): Action[] { return enumerate(s, player, true); }
+export function legalActions(s: GameState, player: PlayerId): Action[] {
+  const out = enumerate(s, player, true);
+  // The decider of a non-terminal state always has at least one legal action (endTurn / a valid pick); an empty list is an engine bug.
+  if (!out.length && s.phase !== "over" && decider(s) === player) {
+    const pc = s.pendingChoice;
+    throw new Error(`engine bug: no legal actions for P${player} in non-terminal state (phase ${s.phase}, turn ${s.turn}, active P${s.activePlayer}, ` +
+      `pending ${pc ? `${pc.kind} "${pc.prompt}" min ${pc.min} max ${pc.max} options [${pc.options.slice(0, 8).join(", ")}]` : "none"}); last log: ${s.log.slice(-5).join(" | ")}`);
+  }
+  return out;
+}
 
 export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Action[] {
   if (s.phase === "over" || decider(s) !== player) return [];
@@ -107,6 +154,23 @@ export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Acti
     default: return [];
   }
 
+  let scratch: GameState | undefined;
+  const holds = (cond: Condition, self?: string): boolean => {
+    scratch ??= cloneState(s);
+    const run: Run = { s: scratch, answers: [], idx: 0 };
+    return evalCond(newCtx(run, player, "other", { self }), cond);
+  };
+  /** Trainer `play` gating: `requires` holds and any `cost` (entry-level or `cost` wrapper) can be paid. */
+  const trainerOk = (d: CardDef): boolean => {
+    const en = playEntry(d);
+    if (!en) return true;
+    const tr = en.trigger;
+    if (tr.t === "play") {
+      if (tr.requires && !holds(tr.requires)) return false;
+      if (tr.cost && !costPayable(s, player, tr.cost, true)) return false;
+    }
+    return costPayable(s, player, en.effect, true);
+  };
   const targets = inPlay(ps);
   const canEvolveNow = !(s.rules.noEvolveOnFirstTurn && s.turn <= 2);
   for (const c of ps.hand) {
@@ -120,11 +184,11 @@ export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Acti
       if (!ps.flags.energyAttachedThisTurn) for (const t of targets) add({ type: "attachEnergy", card: c, target: t.iid }, `en:${d.id}:${t.iid}`);
     } else if (hasSub(d, "item")) {
       const e = playEffect(d);
-      if (!hasMarker(ps.markers, "noPlay:item") && (!e || effectUsable(s, player, e))) add({ type: "playItem", card: c }, `i:${d.id}`);
+      if (!hasMarker(ps.markers, "noPlay:item") && (!e || effectUsable(s, player, e)) && trainerOk(d)) add({ type: "playItem", card: c }, `i:${d.id}`);
     } else if (hasSub(d, "supporter")) {
       const e = playEffect(d);
       if (!ps.flags.supporterPlayedThisTurn && !hasMarker(ps.markers, "noPlay:supporter")
-        && !(s.rules.noSupporterOnFirstTurnOfGame && isFirstTurnOfGame(s, player)) && (!e || effectUsable(s, player, e)))
+        && !(s.rules.noSupporterOnFirstTurnOfGame && isFirstTurnOfGame(s, player)) && (!e || effectUsable(s, player, e)) && trainerOk(d))
         add({ type: "playSupporter", card: c }, `s:${d.id}`);
     } else if (hasSub(d, "stadium")) {
       if (!ps.flags.stadiumPlayedThisTurn && !(s.stadium && defOf(s.stadium.iid).name === d.name)) add({ type: "playStadium", card: c }, `st:${d.id}`);
@@ -134,18 +198,18 @@ export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Acti
   }
 
   // abilities
-  if (!s.players.some((x) => hasMarker(x.markers, "noAbility"))) {
+  {
     for (const t of targets) {
+      if (abilityLocked(s, t)) continue;
       const abs = topDef(t).abilities ?? [];
       abs.forEach((ab, i) => {
         if (ab.trigger && ab.trigger.t !== "ability") return;
         if (ab.limit === "oncePerTurn" && t.usedAbilities.includes(ab.name)) return;
         if (ab.limit === "oncePerGame" && ps.usedGameAbilities.includes(ab.name)) return;
+        if (nameLimited(ab) && ps.flags.abilityNamesUsed.includes(ab.name)) return;
+        if (ab.trigger?.t === "ability" && ab.trigger.costToUse && !costPayable(s, player, ab.trigger.costToUse, false)) return;
         if (!effectUsable(s, player, ab.effect)) return;
-        if (ab.requires) {
-          const run: Run = { s: cloneState(s), answers: [], idx: 0 };
-          if (!evalCond(newCtx(run, player, "ability", { self: t.iid }), ab.requires)) return;
-        }
+        if (ab.requires && !holds(ab.requires, t.iid)) return;
         out.push({ type: "useAbility", pokemon: t.iid, abilityIndex: i });
       });
     }

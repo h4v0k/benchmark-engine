@@ -28,7 +28,7 @@ export const DEFAULT_RULES: RulesConfig = {
 };
 
 /** Persistent effect marker. expiresAfterTurn: removed once that global turn number has ended (undefined = while in play). */
-export interface Marker { key: string; value?: number; expiresAfterTurn?: number }
+export interface Marker { key: string; value?: number; expiresAfterTurn?: number; /** only applies when the Defending Pokémon matches (damageDealt markers) */ againstFilter?: import("./dsl/types.js").CardFilter }
 export interface StatusSet { asleep: boolean; paralyzed: boolean; confused: boolean; poisoned: boolean; burned: boolean }
 
 export interface PokemonInPlay {
@@ -53,6 +53,8 @@ export interface PlayerFlags {
   retreatedThisTurn: boolean;
   gxUsed: boolean;
   vstarUsed: boolean;
+  /** ability names already used this turn by any of the player's Pokémon (oncePerNamePerTurn) */
+  abilityNamesUsed: string[];
 }
 export interface PlayerState {
   deck: string[]; // top first
@@ -67,7 +69,8 @@ export interface PlayerState {
   lastKOTurn: number;
   usedGameAbilities: string[];
 }
-export type ChoiceKind = "pokemon" | "cards" | "option" | "yesno" | "mulliganDraw";
+export type ChoiceKind = "pokemon" | "cards" | "option" | "yesno" | "mulliganDraw" | "distribute";
+/** kind "distribute": options are target ids, min=max=total to split; each pick is `${id}=${count}` (counts >= 1, summing to total). */
 export interface ChoiceReq { player: PlayerId; kind: ChoiceKind; options: string[]; min: number; max: number; prompt: string }
 export interface PendingChoice extends ChoiceReq {
   /** Resume info (replay model, docs/ENGINE.md): originating action, answers so far, and the pre-action snapshot to replay from. The surrounding state shows the partially-resolved position. */
@@ -97,7 +100,7 @@ export interface GameState {
 export const emptyStatus = (): StatusSet => ({ asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false });
 export const emptyFlags = (): PlayerFlags => ({
   energyAttachedThisTurn: false, supporterPlayedThisTurn: false, stadiumPlayedThisTurn: false,
-  retreatedThisTurn: false, gxUsed: false, vstarUsed: false,
+  retreatedThisTurn: false, gxUsed: false, vstarUsed: false, abilityNamesUsed: [],
 });
 export const newPlayer = (): PlayerState => ({
   deck: [], hand: [], discard: [], prizes: [], active: null, bench: [], lostZone: [],
