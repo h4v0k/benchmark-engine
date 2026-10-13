@@ -43,7 +43,7 @@ discovery; best-of-3 and clock modeling.
 3. **Search pilot.** Determinized MCTS over `legalActions()`: sample what the opponent could
    hold (consistent with `observe()`), search, pick the best line. Greedy as the rollout
    policy. Bar: beats greedy ≥85%, games end by prizes, deterministic for a seed.
-4. **A/B framework.** Variant vs meta-weighted field; confidence ranges; two-stage
+4. **A/B framework** *(done, M3c: `src/experiments/ab.ts`, `docs/EXPERIMENTS.md`)*. Variant vs meta-weighted field; confidence ranges; two-stage
    screen-then-confirm (testing many swaps means some look good by chance); mechanism stats
    from the event stream; verdict = better / worse / too close + games needed.
 5. **First finding.** One slot test on the real Dragapult list, checked against what a

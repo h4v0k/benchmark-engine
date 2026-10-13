@@ -10,3 +10,4 @@ export type * from "./dsl/types.js";
 export * from "./events.js";
 export { searchAgent, evaluateActions, heuristicValue, bestIndex, DEFAULT_SEARCH, FAST_SEARCH, STRONG_SEARCH, SEARCH_PRESETS, type SearchConfig, type ActionEval } from "./agents/search.js";
 export { HW } from "./agents/search.js";
+export * from "./experiments/ab.js";

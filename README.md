@@ -12,6 +12,8 @@ npm run typecheck
 npm test              # builds, then runs node:test (Node >= 20; developed on 22)
 ```
 
+**A/B experiments:** `node scripts/experiment.mjs <spec.json>` evaluates list changes against a weighted field with paired seeds and confidence intervals; see `docs/EXPERIMENTS.md`.
+
 ## Architecture (in 10 lines)
 
 1. `src/dsl/types.ts` — the effect DSL (cards are data: `Entry[]` of trigger + effect). See `docs/DSL.md`.
