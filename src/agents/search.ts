@@ -19,12 +19,12 @@
 // The real hidden state is never read to decide anything: the world depends on it only through the sorted multisets and counts.
 import { decider, legalActions, sameAction, wasIssued, type Action } from "../actions.js";
 import { applyAction } from "../game.js";
-import { isPokemon } from "../cards/model.js";
+import { defOf, isPokemon } from "../cards/model.js";
 import { makeRng, next, shuffle, type Rng } from "../rng.js";
 import { canPay, providedEnergy } from "../rules.js";
 import { cloneState, inPlay, other, topDef, type GameState, type PlayerId, type PokemonInPlay } from "../state.js";
-import { greedyAgent } from "./greedy.js";
-import { mainLineEvolution, missing, tempoInfo, typesOf } from "./tempo.js";
+import { greedyAgent, gustWorthIt } from "./greedy.js";
+import { mainLineBasic, mainLineEvolution, missing, policySupporter, preferredChoice, pruneSupporters, tempoInfo, typesOf } from "./tempo.js";
 import type { Agent } from "./random.js";
 
 export interface SearchConfig {
@@ -183,7 +183,12 @@ function makeNode(s: GameState, root: PlayerId, cfg: SearchConfig, rng: Rng): No
   if (mover === null) return node;
   const g = greedyAgent(s, noRng);
   if (mover !== root && cfg.opponentModel === "greedy") { node.acts = [g]; node.untried = [0]; node.kids = [null]; return node; }
-  const acts = legalActions(s, mover);
+  // setup policy (tempo.ts): Crispin's Energy choices are answered by the shared helper, not explored
+  const pref = s.pendingChoice ? preferredChoice(s, s.pendingChoice) : undefined;
+  if (pref) { const a: Action = { type: "choose", picks: pref }; node.acts = [a]; node.untried = [0]; node.kids = [null]; return node; }
+  // pruning rule (narrow): among Supporter plays keep only the best-ranked one (Boss's Orders without a KO is never kept) -- the 2-turn horizon cannot see setup payoff
+  let acts = legalActions(s, mover);
+  if (s.phase === "main" && !s.pendingChoice) acts = pruneSupporters(s, mover, acts, acts.some((a) => a.type === "playSupporter" && defOf(a.card).name === "Boss's Orders") && gustWorthIt(s, mover));
   let idx = acts.map((_, i) => i);
   const gi = acts.findIndex((a) => sameAction(a, g));
   if (gi > 0) idx = [gi, ...idx.filter((i) => i !== gi)];
@@ -293,8 +298,16 @@ export function searchAgent(config: Partial<SearchConfig> = {}): Agent {
     if (state.phase !== "main") return greedyAgent(state, rng);
     const acts = legalActions(state, pl);
     if (acts.length === 1) return acts[0]!;
+    const pref = state.pendingChoice ? preferredChoice(state, state.pendingChoice) : undefined; // Crispin's Energy choices: shared setup policy
+    if (pref) return { type: "choose", picks: pref };
     const evo = mainLineEvolution(state, pl, acts); // evolving the main attacker's line is tempo the 2-turn horizon undervalues: not searched
     if (evo) return evo;
+    const basic = mainLineBasic(state, pl, acts); // bench the main attacker line's Basic (Dreepy): same reasoning, not searched
+    if (basic && !state.pendingChoice) return basic;
+    if (!state.pendingChoice && acts.some((a) => a.type === "playSupporter")) { // setup Supporter (Crispin for a short line / draw on a small hand): policy, not searched
+      const sup = policySupporter(state, pl, acts, acts.some((a) => a.type === "playSupporter" && defOf(a.card).name === "Boss's Orders") && gustWorthIt(state, pl));
+      if (sup) return sup;
+    }
     const ev = evaluateActions(state, pl, cfg, rng);
     return ev[bestIndex(ev)]!.action;
   };
