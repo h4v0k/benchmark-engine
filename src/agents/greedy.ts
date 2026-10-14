@@ -4,7 +4,7 @@ import { defOf, hasSub, isEnergy, isPokemon } from "../cards/model.js";
 import { canPay, maxHp, providedEnergy } from "../rules.js";
 import { findPokemon, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "../state.js";
 import type { Agent } from "./random.js";
-import { holdForLine, mainAttach, missing, preferredChoice, supporterRank, tempoInfo, typesOf } from "./tempo.js";
+import { candyPlay, holdForLine, mainAttach, missing, preferredChoice, supporterRank, tempoInfo, typesOf } from "./tempo.js";
 
 const DRAW_ABILITIES = new Set(["Trade", "Recon Directive", "Flip the Script", "Run Away Draw"]);
 const LINE = /^(Dreepy|Drakloak|Dragapult ex|N's Zorua|N's Zoroark ex)$/;
@@ -115,7 +115,9 @@ export const greedyAgent: Agent = (s) => {
   const deck = ps.deck.length, hand = ps.hand.length;
   // 1. bench Basics (up to 3)
   if (ps.bench.length < 3) { const b = first("playBasicToBench"); const pref = b.find((a) => LINE.test(defOf(a.card).name)) ?? b[0]; if (pref) return pref; }
-  // 2. evolve whenever legal (prefer the main lines)
+  // 2. Rare Candy onto the main line's waiting Basic first (before a normal evolution uses the Basic up), then evolve whenever legal
+  { const candy = candyPlay(s, pl, acts); if (candy) return candy; }
+  // 2b. evolve whenever legal (prefer the main lines)
   const ev = first("evolve").sort((a, b) => Number(LINE.test(defOf(b.card).name)) - Number(LINE.test(defOf(a.card).name)));
   if (ev[0]) return ev[0];
   // 3. attach Energy: first to the main attacker's line (the Pokémon being evolved included) if the card brings its big attack closer;

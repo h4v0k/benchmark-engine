@@ -90,7 +90,8 @@ export type Effect =
   | { e: "moveEnergy"; from: Selector; to: Selector; filter?: CardFilter; count: Amount }
   | { e: "putOnBench"; sel: CardSel }
   | { e: "returnToHand"; who: Selector; withAttached?: boolean }
-  | { e: "evolve"; from: Selector; sel: CardSel }
+  // evolve a chosen Pokémon in play with a chosen card from `sel` (normally the hand); `skipStage`: a Basic evolves straight into a Stage 2 (Rare Candy). Not on a player's first turn, not a Pokémon put into play this turn.
+  | { e: "evolve"; from: Selector; sel: CardSel; skipStage?: boolean }
   // position
   | { e: "switch"; player: PlayerRef; whichBench: Selector; chooser?: PlayerRef } // active<->bench
   | { e: "retreatCost"; who: Selector; delta: number; duration: Duration }

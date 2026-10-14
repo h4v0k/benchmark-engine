@@ -1,6 +1,7 @@
 // Tempo model shared by the greedy and search pilots: which Pokémon is (or will become) the deck's main attacker, and how far is it from using its big attack.
 import { isPokemon, isEnergy, registeredDefs, registrySize, defOf, type CardDef } from "../cards/model.js";
 import type { Action } from "../actions.js";
+import { canEvolveOnto } from "../interpreter.js";
 import { findPokemon, inPlay, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "../state.js";
 
 // ---- tempo: which Pokémon is (or will become) the deck's main attacker, and what does its big attack still need?
@@ -43,8 +44,26 @@ export function tempoInfo(s: GameState, pl: PlayerId): Map<PokemonInPlay, Main &
   return out;
 }
 
+/** (main-line Pokémon in play, Stage 2 of the same line in hand) pairs a Rare Candy could evolve right now (engine rules: not first turn, not put into play this turn, Basic only). */
+export function candyPairs(s: GameState, pl: PlayerId): Array<{ p: PokemonInPlay; card: string }> {
+  const info = tempoInfo(s, pl), out: Array<{ p: PokemonInPlay; card: string }> = [];
+  for (const [p, m] of info) {
+    if (!m.tier1) continue;
+    for (const c of s.players[pl].hand) if (canEvolveOnto(s, p, c, true) && mainAttackOfDef(defOf(c)).dmg >= m.dmg) out.push({ p, card: c });
+  }
+  return out;
+}
+/** Rare Candy onto a main-line Basic that already waited a turn (Dreepy -> Dragapult ex, skipping Drakloak): always right when legal, and played before any normal evolution
+ *  so the Stage 1 is not spent on the Basic the Candy needs. */
+export function candyPlay(s: GameState, pl: PlayerId, legal: Action[]): Action | undefined {
+  const a = legal.find((x) => x.type === "playItem" && defOf(x.card).name === "Rare Candy");
+  return a && candyPairs(s, pl).length ? a : undefined;
+}
+
 /** An evolution of a tier-1 (main attacker line) Pokémon that is legal now: always right, so the search pilot plays it without searching. */
 export function mainLineEvolution(s: GameState, pl: PlayerId, legal: Action[]): Action | undefined {
+  const candy = candyPlay(s, pl, legal);
+  if (candy) return candy;
   let info: ReturnType<typeof tempoInfo> | undefined;
   for (const a of legal) {
     if (a.type !== "evolve") continue;
@@ -163,9 +182,15 @@ function pokemonSearchPick(s: GameState, pc: PendingChoice): string[] | undefine
 
 /** Default answers to the pending choices of Energy-fetching effects (Crispin: which Energy to fetch, which goes to hand, which Pokémon gets the other). undefined = not one of those. */
 export function preferredChoice(s: GameState, pc: PendingChoice): string[] | undefined {
+  const origin = pc.origin?.action;
+  if (origin?.type === "playItem" && defOf(origin.card).name === "Rare Candy") { // which Basic and which Stage 2: the main line's, the biggest attacker first
+    const pairs = candyPairs(s, pc.player);
+    if (pc.kind === "pokemon") { const t = pairs.map((x) => x.p.iid).find((i) => pc.options.includes(i)); return t ? [t] : undefined; }
+    if (pc.kind === "cards") { const c = [...pc.options].sort((a, b) => mainAttackOfDef(defOf(b)).dmg - mainAttackOfDef(defOf(a)).dmg || (a < b ? -1 : 1))[0]; return c ? [c] : undefined; }
+    return undefined;
+  }
   const picked = pokemonSearchPick(s, pc);
   if (picked) return picked;
-  const origin = pc.origin?.action;
   if (!origin || origin.type !== "playSupporter" || defOf(origin.card).name !== "Crispin") return undefined;
   const pl = pc.player;
   // how much would attaching this Energy to its best main-line Pokémon close the gap (0 = nothing, bigger = better)

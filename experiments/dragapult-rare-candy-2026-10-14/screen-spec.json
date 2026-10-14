@@ -1,0 +1,38 @@
+{
+  "name": "dragapult-rare-candy",
+  "base": {
+    "deck": "dragapult",
+    "name": "Dragapult ex (Recife 3rd place list)"
+  },
+  "variants": [
+    {
+      "name": "2 Candy for Drakloak+Pad",
+      "change": "-1 Drakloak -1 Poké Pad +2 Rare Candy"
+    },
+    {
+      "name": "2 Candy for Drakloak+Hammer",
+      "change": "-1 Drakloak -1 Crushing Hammer +2 Rare Candy"
+    },
+    {
+      "name": "1 Candy for Pad",
+      "change": "-1 Poké Pad +1 Rare Candy"
+    }
+  ],
+  "field": [
+    {
+      "deck": "dragapult",
+      "name": "Dragapult ex",
+      "weight": 33.4
+    },
+    {
+      "deck": "zoroark",
+      "name": "N's Zoroark ex",
+      "weight": 9.4
+    }
+  ],
+  "date": "2026-10-14",
+  "gamesPerMatchup": 600,
+  "agent": "greedy",
+  "seedBase": 3000,
+  "stage": "screen"
+}

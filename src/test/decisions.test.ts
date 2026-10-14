@@ -6,28 +6,29 @@ import { decider, legalActions, type Action } from "../actions.js";
 import { greedyAgent } from "../agents/greedy.js";
 import type { Agent } from "../agents/random.js";
 import { FAST_SEARCH, searchAgent } from "../agents/search.js";
-import { DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK } from "../cards/standard/index.js";
-import { defIdOf, defOf } from "../cards/model.js";
+import { CARD_DEFS, DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK } from "../cards/standard/index.js";
+import { defIdOf, defOf, registerCards } from "../cards/model.js";
 import { applyAction, createGame } from "../game.js";
 import { makeRng } from "../rng.js";
 import { mintCard, newPokemon, topDef, type GameState, type PlayerId, type PokemonInPlay } from "../state.js";
 
+registerCards(Object.values(CARD_DEFS)); // Rare Candy is not in either stock list
 const DREEPY = "sv6-128", DRAKLOAK = "sv6-129", DRAGAPULT = "sv6-130", MUNKIDORI = "sv6-95", BUDEW = "me2pt5-16";
-const CRISPIN = "sv7-133", LILLIES = "me1-119", BOSS = "me1-114", HAMMER = "me3-71", POKE_PAD = "me3-81";
+const RARE_CANDY = "me1-125", CRISPIN = "sv7-133", LILLIES = "me1-119", BOSS = "me1-114", HAMMER = "me3-71", POKE_PAD = "me3-81";
 const FIRE = "basic-r", PSYCHIC = "basic-p", DARK = "basic-d", ZORUA = "sv9-97", ZOROARK = "sv9-98";
 
 const PILOTS: Array<[string, () => Agent]> = [["greedy", () => greedyAgent], ["search:fast", () => searchAgent(FAST_SEARCH)]];
 
 interface Spec {
   active: [string, string[]?]; bench?: Array<[string, string[]?]>; hand: string[]; deck?: string[]; deckSize?: number;
-  oppActive?: [string, number?]; oppBench?: Array<[string, number?]>; attached?: boolean;
+  oppActive?: [string, number?]; oppBench?: Array<[string, number?]>; attached?: boolean; secondPlayer?: boolean;
 }
 /** P0 (the Dragapult ex player, first player) on its own turn 2 (game turn 3). The deck holds Fire/Psychic/Darkness Energy plus filler. */
 function position(sp: Spec): GameState {
   let s = createGame(DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK, 11);
   while (s.firstPlayer !== 0) s = createGame(DRAGAPULT_EX_DECK, NS_ZOROARK_EX_DECK, s.seed + 1);
   for (let g = 0; s.phase !== "main"; g++) { assert.ok(g < 200); const a = legalActions(s, decider(s)!); s = applyAction(s, s.pendingChoice ? a[a.length - 1]! : a[0]!); }
-  s.turn = 3; s.activePlayer = 0;
+  s.turn = sp.secondPlayer ? 4 : 3; s.activePlayer = 0; if (sp.secondPlayer) s.firstPlayer = 1; // own turn 2 either way
   const mon = (id: string, en: string[] = [], dmg = 0): PokemonInPlay => { const p = newPokemon(mintCard(s, id), 0); for (const e of en) p.energy.push(mintCard(s, e)); p.damage = dmg; return p; };
   const p0 = s.players[0], p1 = s.players[1];
   p0.flags = { ...p0.flags, energyAttachedThisTurn: sp.attached ?? false, supporterPlayedThisTurn: false, stadiumPlayedThisTurn: false, retreatedThisTurn: false };
@@ -112,5 +113,19 @@ for (const [who, mk] of PILOTS) {
 
   test(`decision f [${who}]: deck-out guard: with 8 cards left and a small hand, Lillie's Determination is not played`, () => {
     each(who, mk, { active: [DRAKLOAK, [FIRE, PSYCHIC]], bench: [[BUDEW]], hand: [LILLIES, DREEPY, BOSS], deckSize: 8, oppActive: [ZOROARK, 0], oppBench: [[ZOROARK, 0]] }, (t, why) => assert.deepEqual(t.supporters, [], why));
+  });
+}
+
+for (const [who, mk] of PILOTS) {
+  test(`decision g [${who}]: own turn 2 going second, Dreepy (1 Energy) waited a turn, Dragapult ex + Rare Candy + Crispin: Candy, Crispin for the 2nd Energy, Phantom Dive`, () => {
+    each(who, mk, { active: [DREEPY, [FIRE]], bench: [[BUDEW]], hand: [DRAGAPULT, RARE_CANDY, CRISPIN], secondPlayer: true, oppActive: [ZOROARK, 0], oppBench: [[ZORUA, 0]] }, (t, why) => {
+      assert.ok(t.log.includes("playItem:Rare Candy"), why);
+      assert.ok(t.log.indexOf("playItem:Rare Candy") < t.log.indexOf("playSupporter:Crispin"), `${why}; Candy first so Crispin's Energy lands on the Dragapult`);
+      const [dp] = byName(t.s, "Dragapult ex");
+      assert.ok(dp, why);
+      assert.ok(dp.energy.some((e) => defIdOf(e) === FIRE) && dp.energy.some((e) => defIdOf(e) === PSYCHIC), `${why}; Dragapult holds ${energyTypes(dp)}`);
+      assert.equal(t.log[t.log.length - 1], "attack", why);
+      assert.ok(t.s.players[1].active!.damage >= 200 || t.s.players[1].prizes.length < 6 || t.s.players[0].prizes.length < 6, `${why}; Phantom Dive landed`);
+    });
   });
 }

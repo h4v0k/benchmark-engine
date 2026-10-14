@@ -129,3 +129,15 @@ own turn 5 (40-48% of games attack by T4): the remaining delay is drawing Dreepy
 search:fast vs greedy (100 games) is now 84% (was 87-89% against the old greedy; the weak pairing is search-as-Zoroark vs the stronger greedy-Dragapult, 11/24), so
 `src/test/search.test.ts` asserts >= 70% (comment there). golden-50.json was regenerated because greedy's behaviour changed (engine unchanged); the hidden-information
 test now probes seed 25 (seed 24's greedy game became too short for its 6 probe turns).
+
+## Rare Candy (M3d-2, 2026-10-14)
+
+Rare Candy (`me1-125`, MEG, regulation mark I, newest Standard-legal printing) is implemented through the DSL `evolve` node (`skipStage: true`): choose a Basic in play (not put into play
+this turn), then a Stage 2 in hand whose `evolvesFrom` Stage 1 itself `evolvesFrom` that Basic (checked against the registered card defs); not on either player's first turn. Side effects are the
+normal evolution ones (`applyEvolution`, shared with the `evolve` action): damage / Energy / Tool kept, Special Conditions and markers cleared, `evolvedThisTurn`, `onEvolve` rules. The Item is only
+offered when some (Basic, Stage 2) pair qualifies. Experiment: `experiments/dragapult-rare-candy.json` (three Candy variants of the Recife list; greedy screen, `search:fast` confirm of the top 2).
+
+Pilot caveat: both pilots play Candy whenever a main-line pair exists (`candyPlay` in `src/agents/tempo.ts`, before any normal evolution so the Stage 1 is not spent on the Basic the Candy needs;
+search plays it without searching, like the main-line evolution; pending target / card choices use `preferredChoice`). They do not plan around holding a Candy for a later turn, do not
+mulligan-evaluate or search with the goal "Dreepy + Dragapult ex + Candy", and the Energy shortfall (R and P by own turn 2-3) still binds, so the pilots probably under-realise the card relative to a human who
+sequences Poffin, Candy and Crispin on purpose. Read Candy results as a lower bound on the card's tempo value for this pilot, not as a verdict on the card.
