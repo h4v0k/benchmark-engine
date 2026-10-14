@@ -4,7 +4,7 @@ import { defOf, hasSub, isEnergy, isPokemon } from "../cards/model.js";
 import { canPay, maxHp, providedEnergy } from "../rules.js";
 import { findPokemon, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "../state.js";
 import type { Agent } from "./random.js";
-import { missing, tempoInfo, typesOf } from "./tempo.js";
+import { candyPlay, holdForLine, mainAttach, missing, preferredChoice, supporterRank, tempoInfo, typesOf } from "./tempo.js";
 
 const DRAW_ABILITIES = new Set(["Trade", "Recon Directive", "Flip the Script", "Run Away Draw"]);
 const LINE = /^(Dreepy|Drakloak|Dragapult ex|N's Zorua|N's Zoroark ex)$/;
@@ -47,6 +47,8 @@ const byValue = (ids: string[], desc: boolean): string[] => [...ids].sort((a, b)
 function answerChoice(s: GameState, pc: PendingChoice): Action {
   const pl = pc.player, opts = pc.options;
   const pick = (ids: string[]): Action => ({ type: "choose", picks: ids });
+  const pref = preferredChoice(s, pc); // shared setup policy (Crispin's fetch / hand / attach-target choices)
+  if (pref) return pick(pref);
   switch (pc.kind) {
     case "yesno": return pick(["yes"]);
     case "mulliganDraw": return pick([opts[opts.length - 1]!]);
@@ -65,6 +67,7 @@ function answerChoice(s: GameState, pc: PendingChoice): Action {
     }
     case "pokemon": {
       const ps = opts.map((id) => findPokemon(s, id)!);
+      if (pc.origin?.action.type === "playSupporter" && defOf(pc.origin.action.card).name === "Crispin") return pick([ps.sort((a, b) => shortfall(a.p) - shortfall(b.p) || Number(b.p === s.players[pl].active) - Number(a.p === s.players[pl].active))[0]!.p.iid]); // no main-line gain: the next-best attacker
       if (/promote/.test(pc.prompt)) return pick([ps.sort((a, b) => bestDmg(s, b.p, null) - bestDmg(s, a.p, null) || hpLeft(s, b.p) - hpLeft(s, a.p))[0]!.p.iid]);
       if (ps[0]!.player !== pl) { // an opposing target: KO-able first, then lowest HP left
         const me = s.players[pl].active; const dmg = me ? bestDmg(s, me, null) : 0;
@@ -83,7 +86,7 @@ function answerChoice(s: GameState, pc: PendingChoice): Action {
 }
 
 /** Does the Boss's-Orders-style gust pay off: some benched opposing Pokémon can be KO'd by our Active, and the current Defender can't. */
-function gustWorthIt(s: GameState, pl: PlayerId): boolean {
+export function gustWorthIt(s: GameState, pl: PlayerId): boolean {
   const me = s.players[pl].active, opp = s.players[other(pl)];
   if (!me || !opp.active || !opp.bench.length) return false;
   const best = (t: PokemonInPlay) => bestDmg(s, me, t);
@@ -112,22 +115,18 @@ export const greedyAgent: Agent = (s) => {
   const deck = ps.deck.length, hand = ps.hand.length;
   // 1. bench Basics (up to 3)
   if (ps.bench.length < 3) { const b = first("playBasicToBench"); const pref = b.find((a) => LINE.test(defOf(a.card).name)) ?? b[0]; if (pref) return pref; }
-  // 2. evolve whenever legal (prefer the main lines)
+  // 2. Rare Candy onto the main line's waiting Basic first (before a normal evolution uses the Basic up), then evolve whenever legal
+  { const candy = candyPlay(s, pl, acts); if (candy) return candy; }
+  // 2b. evolve whenever legal (prefer the main lines)
   const ev = first("evolve").sort((a, b) => Number(LINE.test(defOf(b.card).name)) - Number(LINE.test(defOf(a.card).name)));
   if (ev[0]) return ev[0];
   // 3. attach Energy: first to the main attacker's line (the Pokémon being evolved included) if the card brings its big attack closer;
   //    otherwise to whoever can attack soonest (active wins ties)
   {
-    const info = tempoInfo(s, pl);
-    const toMain = first("attachEnergy").flatMap((a) => {
-      const t = findPokemon(s, a.target)!.p, m = info.get(t);
-      if (!m?.tier1) return [];
-      const cur = missing(m.cost, typesOf(t.energy)), after = missing(m.cost, typesOf([...t.energy, a.card]));
-      return after < cur ? [{ a, after, stage: m.stage, evolved: t.below.length, act: t === me }] : [];
-    }).sort((x, y) => x.after - y.after || y.evolved - x.evolved || Number(y.act) - Number(x.act));
-    if (toMain[0]) return toMain[0].a;
+    const toMain = mainAttach(s, pl, first("attachEnergy"));
+    if (toMain) return toMain;
   }
-  const att = first("attachEnergy").map((a) => { const t = findPokemon(s, a.target)!.p; return { a, sf: shortfall(t, [a.card]), cur: shortfall(t), act: t === me }; })
+  const att = first("attachEnergy").filter((a) => !holdForLine(s, pl, a.card)).map((a) => { const t = findPokemon(s, a.target)!.p; return { a, sf: shortfall(t, [a.card]), cur: shortfall(t), act: t === me }; })
     .filter((x) => x.sf < x.cur || x.cur > 0).sort((x, y) => x.sf - y.sf || Number(y.act) - Number(x.act));
   if (att[0]) return att[0].a;
   const tool = first("attachTool").find((a) => a.target === me?.iid && topDef(me!).types?.includes("D"));
@@ -137,21 +136,30 @@ export const greedyAgent: Agent = (s) => {
     const p = findPokemon(s, a.pokemon)!.p; const ab = topDef(p).abilities![a.abilityIndex]!;
     if (DRAW_ABILITIES.has(ab.name) ? hand < 5 && deck > 12 : ab.name === "Adrena-Brain") return a;
   }
-  // 5. Supporters
-  for (const a of first("playSupporter")) {
-    const n = defOf(a.card).name;
-    if (n === "Boss's Orders") { if (gustWorthIt(s, pl)) return a; }
-    else if (n === "Lillie's Determination" || n === "Judge") { if (hand <= 3 && deck > 12) return a; }
-    else if (n === "Black Belt's Training") { if (me && affordable(me).length) return a; }
-    else return a;
+  const pickItem = (): Action | undefined => {
+    for (const a of first("playItem")) {
+      const n = defOf(a.card).name;
+      if (n === "Unfair Stamp" && !(hand <= 3 && deck > 12)) continue;
+      if (n === "Special Red Card" || n === "Night Stretcher" && !ps.discard.some((c) => isPokemon(defOf(c)))) continue;
+      return a;
+    }
+    return undefined;
+  };
+  // 5. Supporters, in the shared setup order (tempo.ts supporterRank): gust that KOs, Crispin while the main line is short of its attack cost, draw, other
+  {
+    const gust = gustWorthIt(s, pl);
+    const ranked = first("playSupporter").flatMap((a) => {
+      const n = defOf(a.card).name;
+      const useful = n === "Black Belt's Training" ? !!(me && affordable(me).length) : true;
+      const r = supporterRank(s, pl, n, gust, useful);
+      return r === null ? [] : [{ a, r }];
+    }).sort((x, y) => x.r - y.r);
+    // a draw Supporter (rank 2) shuffles the hand away: play the Items first (they may find the line's Pokémon)
+    if (ranked[0] && !(ranked[0].r === 2 && pickItem())) return ranked[0].a;
   }
   // 6. Items / Stadium
-  for (const a of first("playItem")) {
-    const n = defOf(a.card).name;
-    if (n === "Unfair Stamp" && !(hand <= 3 && deck > 12)) continue;
-    if (n === "Special Red Card" || n === "Night Stretcher" && !ps.discard.some((c) => isPokemon(defOf(c)))) continue;
-    return a;
-  }
+  const item = pickItem();
+  if (item) return item;
   const st = first("playStadium")[0];
   if (st && !s.stadium) return st;
   // 7. promote the better attacker: retreat when a benched Pokémon can hit clearly harder than the Active (or the Active can't attack at all)

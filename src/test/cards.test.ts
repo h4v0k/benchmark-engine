@@ -136,7 +136,107 @@ test("Dragapult line: Dreepy → Drakloak → Dragapult ex evolution rules (not 
   const out = attack(k, 0); // the lone Benched Pokémon is promoted automatically
   assert.equal(out.players[0].discard.length, 4, "Dragapult ex + Dreepy + Drakloak + Energy");
   assert.equal(out.players[1].prizes.length, 4, "ex gives 2 Prize cards");
-  assert.ok(!Object.values(CARD_DEFS).some((d) => d.name === "Rare Candy"), "Rare Candy is not in the card pool");
+});
+
+// ------------------------------------------------------------------ Rare Candy (evolve effect with skipStage)
+const candyIn = (s: GameState): boolean => acts(s, 0, "playItem").some((a) => nameOf((a as { card: string }).card) === "Rare Candy");
+
+test("Rare Candy: Dreepy → Dragapult ex skipping Drakloak; keeps damage / Energy / Tool, cures Special Conditions, sets evolvedThisTurn", () => {
+  const s = mainState();
+  setActive(s, 0, "dummy"); setActive(s, 1, "dummy");
+  const dreepy = addBench(s, 0, id("Dreepy"), { turnPlayed: 3, energy: [R], damage: 30 });
+  dreepy.status.poisoned = true; dreepy.status.burned = true;
+  const candy = give(s, 0, id("Rare Candy")), dragapult = give(s, 0, id("Dragapult ex")); give(s, 0, id("Drakloak"));
+  const n = play(s, "playItem", candy); // one qualifying Basic and one qualifying Stage 2 (the Drakloak is not one): nothing left to choose
+  assert.equal(n.pendingChoice, undefined);
+  const top = n.players[0].bench[0]!;
+  assert.equal(nameOf(top.iid), "Dragapult ex");
+  assert.deepEqual(top.below.map(nameOf), ["Dreepy"], "Drakloak is skipped");
+  assert.equal(top.damage, 30); assert.equal(top.energy.length, 1);
+  assert.deepEqual(top.status, { asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false });
+  assert.ok(top.evolvedThisTurn);
+  assert.ok(n.players[0].discard.some((c) => nameOf(c) === "Rare Candy"));
+  assert.deepEqual(n.players[0].hand.map(nameOf), ["Drakloak"]);
+  assert.equal(n.events.filter((e) => e.type === "evolve").length, 1);
+  assert.equal(acts(n, 0, "evolve").length, 0, "an evolved Pokémon can't evolve again this turn");
+});
+
+test("Rare Candy: with 2 eligible Basics the player chooses which one evolves", () => {
+  const s = mainState();
+  setActive(s, 0, "dummy"); setActive(s, 1, "dummy");
+  const a = addBench(s, 0, id("Dreepy"), { turnPlayed: 3, energy: [R] }), b = addBench(s, 0, id("Dreepy"), { turnPlayed: 3 });
+  const candy = give(s, 0, id("Rare Candy")); give(s, 0, id("Dragapult ex"));
+  let n = play(s, "playItem", candy);
+  assert.equal(n.pendingChoice!.kind, "pokemon");
+  assert.deepEqual([...n.pendingChoice!.options].sort(), [a.iid, b.iid].sort());
+  n = answer(n, [b.iid]);
+  assert.deepEqual(n.players[0].bench.map((p) => nameOf(p.iid)), ["Dreepy", "Dragapult ex"]);
+  assert.equal(n.players[0].bench[0]!.energy.length, 1);
+});
+
+test("Rare Candy: not on your first turn (either player)", () => {
+  for (const [turn, pl] of [[1, 0], [2, 1]] as const) {
+    const s = mainState(1, turn); s.activePlayer = pl;
+    setActive(s, pl, "dummy"); setActive(s, (1 - pl) as PlayerId, "dummy"); addBench(s, pl, id("Dreepy"));
+    give(s, pl, id("Rare Candy")); give(s, pl, id("Dragapult ex"));
+    assert.ok(!legalActions(s, pl).some((a) => a.type === "playItem" && nameOf((a as { card: string }).card) === "Rare Candy"), `turn ${turn}`);
+  }
+  const s = mainState(1, 3); s.activePlayer = 0; // second turn of the game is fine
+  setActive(s, 0, "dummy"); setActive(s, 1, "dummy"); addBench(s, 0, id("Dreepy"), { turnPlayed: 2 });
+  give(s, 0, id("Rare Candy")); give(s, 0, id("Dragapult ex"));
+  assert.ok(candyIn(s));
+});
+
+test("Rare Candy: not on a Basic put into play this turn", () => {
+  const s = mainState();
+  setActive(s, 0, "dummy"); setActive(s, 1, "dummy");
+  const dreepy = addBench(s, 0, id("Dreepy"), { turnPlayed: s.turn });
+  give(s, 0, id("Rare Candy")); give(s, 0, id("Dragapult ex"));
+  assert.ok(!candyIn(s));
+  dreepy.turnPlayed = s.turn - 1;
+  assert.ok(candyIn(s));
+  // with two Dreepy, only the one that waited a turn is offered
+  const fresh = addBench(s, 0, id("Dreepy"), { turnPlayed: s.turn });
+  const n = play(s, "playItem", s.players[0].hand.find((c) => nameOf(c) === "Rare Candy")!);
+  assert.equal(n.pendingChoice, undefined, "the only Dreepy that waited a turn is the target");
+  assert.deepEqual(n.players[0].bench.map((p) => nameOf(p.iid)), ["Dragapult ex", "Dreepy"], "the one that waited evolved, the fresh one did not");
+  assert.ok(dreepy && fresh);
+});
+
+test("Rare Candy: unplayable without a qualifying (Basic in play, Stage 2 in hand) pair", () => {
+  const s = mainState();
+  setActive(s, 0, "dummy"); setActive(s, 1, "dummy");
+  give(s, 0, id("Rare Candy"));
+  assert.ok(!candyIn(s), "no Stage 2 in hand");
+  const dreepy = addBench(s, 0, id("Dreepy"), { turnPlayed: 3 });
+  give(s, 0, id("Drakloak"));
+  assert.ok(!candyIn(s), "a Stage 1 in hand is not a Stage 2");
+  give(s, 0, id("N's Zoroark ex"));
+  assert.ok(!candyIn(s), "a Stage 2 of another line");
+  const gone = s.players[0].hand.find((c) => nameOf(c) === "Drakloak")!; s.players[0].hand = s.players[0].hand.filter((c) => c !== gone);
+  s.players[0].hand = s.players[0].hand.filter((c) => nameOf(c) !== "N's Zoroark ex"); give(s, 0, id("Dragapult ex"));
+  assert.ok(candyIn(s));
+  // a Stage 1 in play is not a Basic
+  s.players[0].bench = []; const drak = addBench(s, 0, id("Drakloak"), { turnPlayed: 3 });
+  assert.ok(!candyIn(s), "Drakloak in play (not Basic)");
+  assert.ok(dreepy && drak);
+  // a Basic that already evolved this turn is no longer a Basic
+  s.players[0].bench = []; const e = addBench(s, 0, id("Dreepy"), { turnPlayed: 3 });
+  const dk = give(s, 0, id("Drakloak"));
+  const n = applyAction(s, { type: "evolve", target: e.iid, card: dk });
+  assert.ok(!candyIn(n));
+});
+
+test("Rare Candy: Dragapult ex evolved by Candy can attack the same turn (evolving does not restrict attacking)", () => {
+  const s = mainState();
+  const dreepy = setActive(s, 0, id("Dreepy"), { turnPlayed: 3, energy: [R, P] }); setActive(s, 1, "dummy");
+  const candy = give(s, 0, id("Rare Candy")), dragapult = give(s, 0, id("Dragapult ex"));
+  let n = play(s, "playItem", candy);
+  assert.ok(dreepy && dragapult);
+  assert.equal(nameOf(n.players[0].active!.iid), "Dragapult ex");
+  assert.ok(acts(n, 0, "attack").some((a) => (a as { attackIndex: number }).attackIndex === 1), "Phantom Dive is legal");
+  n = attack(n, 1);
+  assert.equal(n.players[1].active!.damage, 200);
 });
 
 test("Drakloak Recon Directive: look at top 2, exactly 1 to hand, the other to the bottom; once per turn", () => {

@@ -165,13 +165,18 @@ export function runGames(spec: ExperimentSpec, opts: RunOptions = {}): GameRecor
 // ---------------------------------------------------------------- analysis
 export interface CardMech {
   copies: number; drawnBy3: number; played: number; playedByN: number; avgFirstPlayTurn: number | null;
+  /** share of ALL games where the card was first played by the seat's own turn k (k = 1..6, cumulative), and the mean own turn of the first play */
+  playedByOwn: number[]; avgFirstPlayOwnTurn: number | null;
   /** OBSERVATIONAL split (not causal: games where a card gets played differ in many other ways) */
   whenPlayed: { n: number; score: number }; whenNotPlayed: { n: number; score: number };
 }
 export interface Mech {
   n: number; avgTurns: number; reasons: Record<string, number>; kosPerGame: number; prizesPerGame: number;
   firstKoTurn: number | null; mainAttackTurn: number | null; mainAttackRate: number; deckOutRate: number; cards: Record<string, CardMech>;
+  /** own-turn numbers (the seat's k-th turn = ceil(game turn / 2)): mean first-KO / first main-attacker-attack own turn, and share of ALL games with a main-attacker attack by own turn 2 / 3 / 4 */
+  firstKoOwnTurn: number | null; mainAttackOwnTurn: number | null; mainAttackByOwn: number[];
 }
+export const ownTurn = (gameTurn: number): number => Math.ceil(gameTurn / 2);
 export interface MatchupRow { field: string; weight: number; n: number; score: number; lo: number; hi: number; mech: Mech }
 export interface DeltaRow { field: string; delta: number; lo: number; hi: number; se: number }
 export interface ArmResult {
@@ -200,6 +205,8 @@ function mechOf(recs: GameRecord[], tracked: string[], copies: Record<string, nu
       copies: copies[c] ?? 0, drawnBy3: recs.filter((r) => r.cards[c]!.drawn3).length / n, played: pl.length / n,
       playedByN: recs.filter((r) => r.cards[c]!.playedTurn !== null && r.cards[c]!.playedTurn! <= turnN).length / n,
       avgFirstPlayTurn: turns.length ? mean(turns) : null,
+      playedByOwn: [1, 2, 3, 4, 5, 6].map((k) => recs.filter((r) => r.cards[c]!.playedTurn !== null && ownTurn(r.cards[c]!.playedTurn!) <= k).length / n),
+      avgFirstPlayOwnTurn: turns.length ? mean(turns.map(ownTurn)) : null,
       whenPlayed: { n: pl.length, score: pl.reduce((x, r) => x + r.score, 0) }, whenNotPlayed: { n: np.length, score: np.reduce((x, r) => x + r.score, 0) },
     };
   }
@@ -207,6 +214,8 @@ function mechOf(recs: GameRecord[], tracked: string[], copies: Record<string, nu
     n, avgTurns: mean(recs.map((r) => r.turns)), reasons, kosPerGame: mean(recs.map((r) => r.kos)), prizesPerGame: mean(recs.map((r) => r.prizes)),
     firstKoTurn: ko.length ? mean(ko.map((r) => r.firstKo!)) : null, mainAttackTurn: at.length ? mean(at.map((r) => r.mainAtk!)) : null,
     mainAttackRate: at.length / n, deckOutRate: mean(recs.map((r) => r.deckOut)), cards,
+    firstKoOwnTurn: ko.length ? mean(ko.map((r) => ownTurn(r.firstKo!))) : null, mainAttackOwnTurn: at.length ? mean(at.map((r) => ownTurn(r.mainAtk!))) : null,
+    mainAttackByOwn: [2, 3, 4].map((k) => at.filter((r) => ownTurn(r.mainAtk!) <= k).length / n),
   };
 }
 /** Field-weighted combination of per-matchup Mech (scalars weighted; nulls renormalized; played-vs-not splits pooled unweighted). */
@@ -222,12 +231,14 @@ function combineMech(ms: Mech[], w: number[]): Mech {
     const pool = (sel: (cm: CardMech) => { n: number; score: number }): { n: number; score: number } => ({ n: ms.reduce((x, m) => x + sel(m.cards[c]!).n, 0), score: ms.reduce((x, m) => x + sel(m.cards[c]!).score, 0) });
     cards[c] = {
       copies: ms[0]!.cards[c]!.copies, drawnBy3: wm((m) => m.cards[c]!.drawnBy3)!, played: wm((m) => m.cards[c]!.played)!, playedByN: wm((m) => m.cards[c]!.playedByN)!,
-      avgFirstPlayTurn: wm((m) => m.cards[c]!.avgFirstPlayTurn), whenPlayed: pool((cm) => cm.whenPlayed), whenNotPlayed: pool((cm) => cm.whenNotPlayed),
+      avgFirstPlayTurn: wm((m) => m.cards[c]!.avgFirstPlayTurn), avgFirstPlayOwnTurn: wm((m) => m.cards[c]!.avgFirstPlayOwnTurn),
+      playedByOwn: ms[0]!.cards[c]!.playedByOwn.map((_, k) => wm((m) => m.cards[c]!.playedByOwn[k]!)!), whenPlayed: pool((cm) => cm.whenPlayed), whenNotPlayed: pool((cm) => cm.whenNotPlayed),
     };
   }
   return {
     n: ms.reduce((x, m) => x + m.n, 0), avgTurns: wm((m) => m.avgTurns)!, reasons, kosPerGame: wm((m) => m.kosPerGame)!, prizesPerGame: wm((m) => m.prizesPerGame)!,
     firstKoTurn: wm((m) => m.firstKoTurn), mainAttackTurn: wm((m) => m.mainAttackTurn), mainAttackRate: wm((m) => m.mainAttackRate)!, deckOutRate: wm((m) => m.deckOutRate)!, cards,
+    firstKoOwnTurn: wm((m) => m.firstKoOwnTurn), mainAttackOwnTurn: wm((m) => m.mainAttackOwnTurn), mainAttackByOwn: ms[0]!.mainAttackByOwn.map((_, k) => wm((m) => m.mainAttackByOwn[k]!)!),
   };
 }
 
@@ -237,6 +248,9 @@ function metrics(main: string): Metric[] {
   return [
     { key: "firstKo", label: "first KO turn", get: (r) => r.firstKo, word: (d, s) => `took its first KO ${abs1(d)} turns ${d < 0 ? "earlier" : "later"} ${s}` },
     { key: "mainAtk", label: `${main} first attack`, get: (r) => r.mainAtk, word: (d, s) => `first attacked with ${main} ${abs1(d)} turns ${d < 0 ? "earlier" : "later"} ${s}` },
+    { key: "mainAtkOwn", label: `${main} first attack (own turn)`, get: (r) => (r.mainAtk === null ? null : ownTurn(r.mainAtk)), word: (d, s) => `first attacked with ${main} ${abs2(d)} own turns ${d < 0 ? "earlier" : "later"} ${s}` },
+    { key: "atkBy2", label: `${main} attack by own turn 2`, get: (r) => (r.mainAtk !== null && ownTurn(r.mainAtk) <= 2 ? 1 : 0), word: (d, s) => `attacked with ${main} by its own turn 2 in ${abs1(d * 100)} points ${d > 0 ? "more" : "fewer"} games ${s}` },
+    { key: "atkBy3", label: `${main} attack by own turn 3`, get: (r) => (r.mainAtk !== null && ownTurn(r.mainAtk) <= 3 ? 1 : 0), word: (d, s) => `attacked with ${main} by its own turn 3 in ${abs1(d * 100)} points ${d > 0 ? "more" : "fewer"} games ${s}` },
     { key: "turns", label: "game length", get: (r) => r.turns, word: (d, s) => `finished games ${abs1(d)} turns ${d < 0 ? "sooner" : "later"} ${s}` },
     { key: "kos", label: "KOs per game", get: (r) => r.kos, word: (d, s) => `scored ${abs2(d)} ${d > 0 ? "more" : "fewer"} KOs per game ${s}` },
     { key: "prizes", label: "prizes per game", get: (r) => r.prizes, word: (d, s) => `took ${abs2(d)} ${d > 0 ? "more" : "fewer"} prizes per game ${s}` },
@@ -389,6 +403,20 @@ export function renderReport(r: ExperimentResult): string {
     if (!sigNonCard.length) L.push("- No game-flow metric (first KO turn, main-attacker timing, game length, KOs, prizes, deck-outs) changed by more than its noise at this sample size.");
     for (const f of sig) L.push(`- ${f.text}`);
     L.push("");
+    // fixed table: base vs variant, field-weighted, own-turn numbers (the seat's k-th turn), whether or not a difference is significant
+    const b = base.overall.mech, x = v.overall.mech, f1 = (q: number | null): string => (q === null ? "n/a" : q.toFixed(2));
+    L.push(`| Own-turn mechanism (field-weighted) | ${base.name} (base) | ${v.name} |`, "|---|---|---|");
+    L.push(`| ${v.mainAttacker} first attack, mean own turn (games where it attacks) | ${f1(b.mainAttackOwnTurn)} | ${f1(x.mainAttackOwnTurn)} |`);
+    L.push(`| ${v.mainAttacker} attacked by own turn 2 / 3 / 4 (% of all games) | ${b.mainAttackByOwn.map(pc).join(" / ")} | ${x.mainAttackByOwn.map(pc).join(" / ")} |`);
+    L.push(`| games with a ${v.mainAttacker} attack at all | ${pc(b.mainAttackRate)} | ${pc(x.mainAttackRate)} |`);
+    L.push(`| first KO, mean own turn | ${f1(b.firstKoOwnTurn)} | ${f1(x.firstKoOwnTurn)} |`);
+    L.push(`| deck-out rate (the arm loses by decking) | ${pc(b.deckOutRate)} | ${pc(x.deckOutRate)} |`);
+    for (const [c, cm] of Object.entries(x.cards)) {
+      if (cm.copies === b.cards[c]!.copies) continue;
+      L.push(`| ${c} played by own turn 2 / 3 / 4 / 5 (% of all games) | ${b.cards[c]!.playedByOwn.slice(1, 5).map(pc).join(" / ")} | ${cm.playedByOwn.slice(1, 5).map(pc).join(" / ")} |`);
+      L.push(`| ${c} first played, mean own turn (when played) | ${f1(b.cards[c]!.avgFirstPlayOwnTurn)} | ${f1(cm.avgFirstPlayOwnTurn)} |`);
+    }
+    L.push("");
   }
   L.push("### Baseline game flow (base list)", "");
   const bm = base.overall.mech;
@@ -401,7 +429,7 @@ export function renderReport(r: ExperimentResult): string {
   L.push(`- Paired design: base and every variant use the SAME seed and seat in each game (common random numbers), so deltas are intervals on paired differences, much tighter than comparing two independent win rates. Draws count 1/2.`);
   L.push(`- Field (normalized meta share): ${r.meta.field.map((f) => `${f.name} ${(f.weight * 100).toFixed(1)}%`).join(", ")}. Field coverage: this field contains only ${r.meta.field.length} archetype${r.meta.field.length === 1 ? "" : "s"}; results say nothing about matchups outside it, and a real meta has many more.`);
   L.push(`- Intervals: per-matchup Wilson 95%; overall and deltas are normal 95% intervals with per-matchup variances propagated by weight (sum of w^2 var). Verdict = whether the overall delta interval excludes 0. Games needed = games per matchup for a 2-point half-width at the observed variance (about 50% power to detect a true 2-point edge; multiply by ~1.6 for 80% power).`);
-  L.push(`- Mechanism stats are read from the event stream. "Drawn by turn 3" counts draw events (opening hand and draws) by game turn 3, not searches; "played" = benched / evolved into / attached / played; turn numbers are game turns (both players' turns count), "by turn N" uses N=${r.meta.turnN}. Played-vs-not-played win-rate splits are observational and confounded. Mechanism sentences are shown only when the difference exceeds its 95% noise band (unpaired, so conservative).`);
+  L.push(`- Mechanism stats are read from the event stream. "Drawn by turn 3" counts draw events (opening hand and draws) by game turn 3, not searches; "played" = benched / evolved into / attached / played; turn numbers in the sentences are game turns (both players' turns count), "by turn N" uses N=${r.meta.turnN}; the own-turn tables count the seat's own turns (k-th own turn = ceil(game turn / 2)). Played-vs-not-played win-rate splits are observational and confounded. Mechanism sentences are shown only when the difference exceeds its 95% noise band (unpaired, so conservative).`);
   L.push(`- Caveats: only cards implemented in the engine can appear in lists; the pilot plays no hidden-information bluffs; the verdict is about this pilot and this field, not about human play. Testing many variants inflates false positives; use the two-stage workflow and trust only the confirm stage.`);
   return L.join("\n") + "\n";
 }

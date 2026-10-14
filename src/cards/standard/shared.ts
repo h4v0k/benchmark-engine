@@ -101,6 +101,13 @@ export const POKE_PAD = trainer("me3", "POR", "81", "J", "Poké Pad", "Item", [p
   sel: { player: "self", zone: "deck", filter: { supertype: "pokemon", noRuleBox: true }, count: 1, reveal: true },
 })], "Search your deck for a Pokémon that doesn't have a Rule Box, reveal it, and put it into your hand. Then, shuffle your deck.");
 
+// me1-125 (MEG, regulation mark I): newest Standard-legal printing (scripts/extract-cards.mjs fallback-by-name). First turn / "put into play this turn" are enforced by the `evolve` effect.
+export const RARE_CANDY = trainer("me1", "MEG", "125", "I", "Rare Candy", "Item", [play("item", {
+  e: "evolve", skipStage: true,
+  from: pickSelf("play", { subtype: ["basic"] }),
+  sel: { player: "self", zone: "hand", filter: { supertype: "pokemon", subtype: ["stage2"] }, count: 1, chooser: "self" },
+})], "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it, skipping the Stage 1. You can't use this card during your first turn or on a Basic Pokémon that was put into play this turn.");
+
 export const UNFAIR_STAMP = trainer("sv6", "TWM", "165", "H", "Unfair Stamp", "Item", [
   play("item", { e: "seq", steps: [
     { e: "move", sel: { player: "both", zone: "hand", count: { k: "all" } }, to: "deck", position: "shuffle" },
@@ -112,5 +119,5 @@ export const UNFAIR_STAMP = trainer("sv6", "TWM", "165", "H", "Unfair Stamp", "I
 
 export const SHARED_DEFS: CardDef[] = [
   FIRE_ENERGY, PSYCHIC_ENERGY, DARKNESS_ENERGY, MUNKIDORI, BUDEW, MEOWTH_EX,
-  LILLIES_DETERMINATION, BOSS_ORDERS, JUDGE, BUDDY_BUDDY_POFFIN, ULTRA_BALL, NIGHT_STRETCHER, POKE_PAD, UNFAIR_STAMP,
+  LILLIES_DETERMINATION, BOSS_ORDERS, JUDGE, BUDDY_BUDDY_POFFIN, ULTRA_BALL, NIGHT_STRETCHER, POKE_PAD, RARE_CANDY, UNFAIR_STAMP,
 ];
