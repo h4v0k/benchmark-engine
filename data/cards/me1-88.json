@@ -1,0 +1,53 @@
+{
+  "id": "me1-88",
+  "name": "Yveltal",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "110",
+  "types": [
+    "Darkness"
+  ],
+  "attacks": [
+    {
+      "name": "Clutch",
+      "cost": [
+        "Darkness"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "20",
+      "text": "During your opponent's next turn, the Defending Pokémon can't retreat."
+    },
+    {
+      "name": "Dark Feather",
+      "cost": [
+        "Darkness",
+        "Darkness",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 3,
+      "damage": "110",
+      "text": ""
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Lightning",
+      "value": "×2"
+    }
+  ],
+  "resistances": [
+    {
+      "type": "Fighting",
+      "value": "-30"
+    }
+  ],
+  "regulationMark": "I",
+  "number": "88",
+  "rarity": "Rare",
+  "set": {
+    "id": "me1",
+    "ptcgoCode": "MEG"
+  }
+}

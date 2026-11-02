@@ -1,0 +1,19 @@
+{
+  "id": "me1-114",
+  "name": "Boss's Orders",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Supporter"
+  ],
+  "rules": [
+    "Switch in 1 of your opponent's Benched Pokémon to the Active Spot.",
+    "You may play only 1 Supporter card during your turn."
+  ],
+  "regulationMark": "I",
+  "number": "114",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me1",
+    "ptcgoCode": "MEG"
+  }
+}

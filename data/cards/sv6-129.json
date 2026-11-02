@@ -1,0 +1,42 @@
+{
+  "id": "sv6-129",
+  "name": "Drakloak",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Stage 1"
+  ],
+  "hp": "90",
+  "types": [
+    "Dragon"
+  ],
+  "evolvesFrom": "Dreepy",
+  "abilities": [
+    {
+      "name": "Recon Directive",
+      "text": "Once during your turn, you may look at the top 2 cards of your deck and put 1 of them into your hand. Put the other card on the bottom of your deck.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Dragon Headbutt",
+      "cost": [
+        "Fire",
+        "Psychic"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "70",
+      "text": ""
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "129",
+  "rarity": "Common",
+  "set": {
+    "id": "sv6",
+    "ptcgoCode": "TWM"
+  }
+}

@@ -18,8 +18,10 @@ export interface AbilityDef {
   name: string;
   trigger?: Trigger; // {t:"ability",...}
   effect: Effect;
-  limit?: "oncePerTurn" | "oncePerGame";
+  limit?: "oncePerTurn" | "oncePerGame" | "oncePerNamePerTurn";
   requires?: Condition;
+  /** original printed text, for reviewers */
+  text?: string;
 }
 export interface CardDef {
   id: string;
@@ -38,6 +40,8 @@ export interface CardDef {
   resistance?: { type: EnergyType; amount: 30 };
   retreatCost?: number;
   prizeValue?: 1 | 2 | 3;
+  /** original printed card text (all of it), alongside the DSL, for review */
+  text?: string;
   regulationMark?: string;
   setCode?: string;
   number?: string;
@@ -92,13 +96,15 @@ export function matchesFilter(d: CardDef, f: CardFilter | undefined, facts: Poke
   if (f.any && !f.any.some((g) => matchesFilter(d, g, facts))) return false;
   return true;
 }
-/** Deck legality: 60 cards, <=4 copies per name (basic Energy exempt), >=1 Basic Pokémon. */
+/** Deck legality: 60 cards, <=4 copies per name (basic Energy exempt), <=1 ACE SPEC card, >=1 Basic Pokémon. */
 export function validateDeck(deck: CardDef[], size = 60): string[] {
   const errs: string[] = [];
   if (deck.length !== size) errs.push(`deck has ${deck.length} cards, expected ${size}`);
   const counts = new Map<string, number>();
   for (const d of deck) if (!d.subtypes.includes("Basic Energy")) counts.set(d.name, (counts.get(d.name) ?? 0) + 1);
   for (const [n, c] of counts) if (c > 4) errs.push(`${c} copies of ${n}`);
+  const ace = deck.filter((d) => d.subtypes.some((x) => norm(x) === "acespec")).length;
+  if (ace > 1) errs.push(`${ace} ACE SPEC cards (max 1)`);
   if (!deck.some(isBasicPokemon)) errs.push("no Basic Pokémon");
   return errs;
 }

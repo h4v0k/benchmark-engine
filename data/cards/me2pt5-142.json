@@ -1,0 +1,52 @@
+{
+  "id": "me2pt5-142",
+  "name": "Fezandipiti ex",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic",
+    "ex"
+  ],
+  "hp": "210",
+  "types": [
+    "Darkness"
+  ],
+  "abilities": [
+    {
+      "name": "Flip the Script",
+      "text": "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn, you may draw 3 cards. You can't use more than 1 Flip the Script Ability each turn.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Cruel Arrow",
+      "cost": [
+        "Colorless",
+        "Colorless",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 3,
+      "damage": "",
+      "text": "This attack does 100 damage to 1 of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)"
+    }
+  ],
+  "rules": [
+    "Pokémon ex rule: When your Pokémon ex is Knocked Out, your opponent takes 2 Prize cards."
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "142",
+  "rarity": "Double Rare",
+  "set": {
+    "id": "me2pt5",
+    "ptcgoCode": "ASC"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "sv5-129",
+  "name": "Dudunsparce",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Stage 1"
+  ],
+  "hp": "140",
+  "types": [
+    "Colorless"
+  ],
+  "evolvesFrom": "Dunsparce",
+  "abilities": [
+    {
+      "name": "Run Away Draw",
+      "text": "Once during your turn, you may draw 3 cards. If you drew any cards in this way, shuffle this Pokémon and all attached cards into your deck.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Land Crush",
+      "cost": [
+        "Colorless",
+        "Colorless",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 3,
+      "damage": "90",
+      "text": ""
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": [
+    "Colorless",
+    "Colorless",
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "129",
+  "rarity": "Rare",
+  "set": {
+    "id": "sv5",
+    "ptcgoCode": "TEF"
+  }
+}

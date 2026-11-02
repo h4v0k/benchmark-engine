@@ -1,0 +1,19 @@
+{
+  "id": "me3-81",
+  "name": "Poké Pad",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "Search your deck for a Pokémon that doesn't have a Rule Box, reveal it, and put it into your hand. Then, shuffle your deck. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+    "You may play any number of Item cards during your turn."
+  ],
+  "regulationMark": "J",
+  "number": "81",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me3",
+    "ptcgoCode": "POR"
+  }
+}

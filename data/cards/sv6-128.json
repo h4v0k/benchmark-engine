@@ -1,0 +1,43 @@
+{
+  "id": "sv6-128",
+  "name": "Dreepy",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "70",
+  "types": [
+    "Dragon"
+  ],
+  "attacks": [
+    {
+      "name": "Petty Grudge",
+      "cost": [
+        "Psychic"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "10",
+      "text": ""
+    },
+    {
+      "name": "Bite",
+      "cost": [
+        "Fire",
+        "Psychic"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "40",
+      "text": ""
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "128",
+  "rarity": "Common",
+  "set": {
+    "id": "sv6",
+    "ptcgoCode": "TWM"
+  }
+}

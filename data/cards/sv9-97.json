@@ -1,0 +1,39 @@
+{
+  "id": "sv9-97",
+  "name": "N's Zorua",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "70",
+  "types": [
+    "Darkness"
+  ],
+  "attacks": [
+    {
+      "name": "Scratch",
+      "cost": [
+        "Darkness"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "20",
+      "text": ""
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Grass",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "I",
+  "number": "97",
+  "rarity": "Common",
+  "set": {
+    "id": "sv9",
+    "ptcgoCode": "JTG"
+  }
+}

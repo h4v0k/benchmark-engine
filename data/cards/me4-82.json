@@ -1,0 +1,18 @@
+{
+  "id": "me4-82",
+  "name": "Special Red Card",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Item"
+  ],
+  "rules": [
+    "You can use this card only if your opponent has 3 or fewer Prize cards remaining.\n\nYour opponent shuffles their hand and puts it on the bottom of their deck. If they put any cards on the bottom of their deck in this way, they draw 3 cards."
+  ],
+  "regulationMark": "J",
+  "number": "82",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me4",
+    "ptcgoCode": "CRI"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "me3-84",
+  "name": "Rosa's Encouragement",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Supporter"
+  ],
+  "rules": [
+    "You can use this card only if you have more Prize cards remaining than your opponent.  Attach up to 2 Basic Energy cards from your discard pile to 1 of your Stage 2 Pokémon.",
+    "You may play only 1 Supporter card during your turn."
+  ],
+  "regulationMark": "J",
+  "number": "84",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me3",
+    "ptcgoCode": "POR"
+  }
+}

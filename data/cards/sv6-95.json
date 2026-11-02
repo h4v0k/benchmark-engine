@@ -1,0 +1,53 @@
+{
+  "id": "sv6-95",
+  "name": "Munkidori",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "110",
+  "types": [
+    "Psychic"
+  ],
+  "abilities": [
+    {
+      "name": "Adrena-Brain",
+      "text": "Once during your turn, if this Pokémon has any Darkness Energy attached, you may move up to 3 damage counters from 1 of your Pokémon to 1 of your opponent's Pokémon.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Mind Bend",
+      "cost": [
+        "Psychic",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "60",
+      "text": "Your opponent's Active Pokémon is now Confused."
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Darkness",
+      "value": "×2"
+    }
+  ],
+  "resistances": [
+    {
+      "type": "Fighting",
+      "value": "-30"
+    }
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "95",
+  "rarity": "Rare",
+  "set": {
+    "id": "sv6",
+    "ptcgoCode": "TWM"
+  }
+}

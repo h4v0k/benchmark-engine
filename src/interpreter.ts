@@ -1,20 +1,25 @@
 // DSL effect interpreter. Pure state machine: when a decision is needed and no recorded answer exists,
 // `ask` throws NeedChoice; the caller (game.ts) turns that into state.pendingChoice and later REPLAYS the
 // originating action with the recorded answers (deterministic because the rng lives in the state).
-import type { Amount, CardSel, Condition, Duration, Effect, PlayerRef, Selector, Status, Zone } from "./dsl/types.js";
+import type { Amount, CardFilter, CardSel, Condition, Duration, Effect, Entry, PlayerRef, Selector, Status, Trigger, Zone } from "./dsl/types.js";
 import { defOf, isBasicPokemon, matchesFilter } from "./cards/model.js";
 import { flip, shuffle } from "./rng.js";
 import {
   type ChoiceReq, type GameState, type Marker, type PlayerId, type PlayerState, type PokemonInPlay,
-  clearStatuses, discardPokemon, drawCards, findPokemon, hasMarker, inPlay, log, markerSum, newPokemon, other,
+  allCardsOf, clearStatuses, drawCards, findPokemon, hasMarker, inPlay, log, markerSum, newPokemon, other,
   removeItem, swapActive, topDef,
 } from "./state.js";
-import { maxHp, weaknessResistance, toolDef, staticModifiers } from "./rules.js";
+import { maxHp, weaknessResistance } from "./rules.js";
+import { abilityLocked, staticPreventsDamage, staticStat } from "./statics.js";
 
 export class NeedChoice extends Error {
   constructor(public req: ChoiceReq) { super("need choice"); }
 }
-export interface Run { s: GameState; answers: string[][]; idx: number }
+export interface Run {
+  s: GameState; answers: string[][]; idx: number;
+  /** iids that were at/over lethal damage right after the current attack (for onKnockedOut `byAttack`) */
+  attackKOs?: string[];
+}
 export type CtxKind = "attack" | "ability" | "item" | "supporter" | "stadium" | "tool" | "other";
 export interface Ctx {
   run: Run; player: PlayerId; kind: CtxKind;
@@ -23,10 +28,14 @@ export interface Ctx {
   /** attack damage pool toward the Defending Pokémon; null = attack deals no damage */
   dmg: number | null; mods: number; cancelled: boolean;
   didPrev: boolean; discarded: number; endTurn: boolean;
+  /** an attack's damage ignores effects on the Defending Pokémon (`damage{effects:false}`) */
+  ignoreDefEffects: boolean;
+  /** inside a copied attack (recursion guard for copyAttack) */
+  copying: boolean;
 }
 export const newCtx = (run: Run, player: PlayerId, kind: CtxKind, o: { self?: string; attached?: string } = {}): Ctx => ({
   run, player, kind, self: o.self, attached: o.attached, binds: {}, dmg: null, mods: 0, cancelled: false,
-  didPrev: false, discarded: 0, endTurn: false,
+  didPrev: false, discarded: 0, endTurn: false, ignoreDefEffects: false, copying: false,
 });
 
 export function notImplemented(node: { e?: string; k?: string; c?: string; s?: string }): never {
@@ -37,7 +46,8 @@ export function notImplemented(node: { e?: string; k?: string; c?: string; s?: s
 export function ask(run: Run, req: ChoiceReq): string[] {
   const n = req.options.length;
   if (n === 0 || req.max <= 0) return [];
-  if (req.min >= n) return req.options.slice();
+  if (req.kind === "distribute" && n === 1) return [`${req.options[0]}=${req.max}`];
+  if (req.kind !== "distribute" && req.min >= n) return req.options.slice();
   if (run.idx < run.answers.length) {
     const a = run.answers[run.idx++]!;
     if (!validPicks(req, a)) throw new Error(`invalid choice ${JSON.stringify(a)} for ${req.prompt}`);
@@ -46,6 +56,17 @@ export function ask(run: Run, req: ChoiceReq): string[] {
   throw new NeedChoice(req);
 }
 export function validPicks(req: ChoiceReq, picks: string[]): boolean {
+  if (req.kind === "distribute") {
+    const seen = new Set<string>();
+    let sum = 0;
+    for (const p of picks) {
+      const [id, c, ...rest] = p.split("=");
+      const k = Number(c);
+      if (rest.length || !id || !req.options.includes(id) || seen.has(id) || !Number.isInteger(k) || k < 1) return false;
+      seen.add(id); sum += k;
+    }
+    return sum === req.max;
+  }
   if (picks.length < req.min || picks.length > req.max) return false;
   if (new Set(picks).size !== picks.length) return false;
   return picks.every((p) => req.options.includes(p));
@@ -153,7 +174,7 @@ export function evalCond(ctx: Ctx, c: Condition): boolean {
     case "is": { const t = selectPokemon(ctx, c.who); return t.length > 0 && t.every((p) => matchesFilter(topDef(p), c.filter, pokemonFacts(p))); }
     case "has": {
       const need = c.min ?? 1;
-      return countCards(ctx, { player: c.player, zone: c.zone, filter: c.filter }) >= need;
+      return countCards(ctx, { player: c.player, zone: c.zone, filter: c.filter, from: c.from }) >= need;
     }
     case "status": return selectPokemon(ctx, c.who).some((p) => p.status[statusKey(c.status)]);
     case "coin": return coin(s);
@@ -164,6 +185,7 @@ export function evalCond(ctx: Ctx, c: Condition): boolean {
     case "lastCardInHand": return s.players[ctx.player].hand.length === 1;
     case "inPlayActive": return !!ctx.self && s.players[ctx.player].active?.iid === ctx.self;
     case "playedFromHandThisTurn": return false;
+    case "tagged": return s.players[ctx.player].markers.some((m) => m.key === `tag:${c.key}`);
   }
   return notImplemented(c as never);
 }
@@ -171,7 +193,18 @@ const statusKey = (st: Status): keyof PokemonInPlay["status"] =>
   ({ paralyzed: "paralyzed", confused: "confused", asleep: "asleep", burned: "burned", poisoned: "poisoned" } as const)[st];
 
 // ------------------------------------------------------------------ selectors
-export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerRef): PokemonInPlay[] {
+/** Candidates of a `pick` selector (no choice asked). Used to tell whether a "choose 1 of your ..." effect can resolve at all. */
+export function pickCandidates(ctx: Ctx, sel: Extract<Selector, { s: "pick" }>): PokemonInPlay[] {
+  const s = S(ctx);
+  const cands: PokemonInPlay[] = [];
+  for (const pl of players(ctx, sel.player)) {
+    const ps = s.players[pl];
+    const list = sel.where === "active" ? (ps.active ? [ps.active] : []) : sel.where === "bench" ? ps.bench : inPlay(ps);
+    for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p))) cands.push(p);
+  }
+  return cands;
+}
+export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerRef, extra?: CardFilter): PokemonInPlay[] {
   const s = S(ctx);
   switch (sel.s) {
     case "self": return ctx.self && findPokemon(s, ctx.self) ? [byIid(s, ctx.self)] : [];
@@ -183,7 +216,7 @@ export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerR
       for (const pl of players(ctx, sel.player)) {
         const ps = s.players[pl];
         const list = sel.where === "active" ? (ps.active ? [ps.active] : []) : sel.where === "bench" ? ps.bench : inPlay(ps);
-        for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p))) cands.push(p);
+        for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p)) && matchesFilter(topDef(p), extra, pokemonFacts(p))) cands.push(p);
       }
       const { min, max } = countRange(ctx, sel.count);
       if (sel.mode === "all" || sel.mode === "divide" || min === Infinity) return cands;
@@ -235,13 +268,15 @@ function removeCards(s: GameState, owner: PlayerId, zone: Zone, ids: string[]): 
   const arr = zoneArr(s.players[owner], zone);
   for (const id of ids) removeItem(arr, id);
 }
-function addToBench(s: GameState, pl: PlayerId, iid: string): boolean {
+function addToBench(s: GameState, pl: PlayerId, iid: string): PokemonInPlay | null {
   const ps = s.players[pl];
-  if (ps.bench.length >= s.rules.benchSize) return false;
-  ps.bench.push(newPokemon(iid, s.turn));
-  return true;
+  if (ps.bench.length >= s.rules.benchSize) return null;
+  const p = newPokemon(iid, s.turn);
+  ps.bench.push(p);
+  return p;
 }
-function placeCards(s: GameState, owner: PlayerId, to: Zone, ids: string[], pos?: "top" | "bottom" | "shuffle"): void {
+function placeCards(run: Run, owner: PlayerId, to: Zone, ids: string[], pos?: "top" | "bottom" | "shuffle"): void {
+  const s = run.s;
   const ps = s.players[owner];
   switch (to) {
     case "hand": ps.hand.push(...ids); break;
@@ -251,20 +286,27 @@ function placeCards(s: GameState, owner: PlayerId, to: Zone, ids: string[], pos?
       if (pos === "bottom") ps.deck.push(...ids); else ps.deck.unshift(...ids);
       if (pos === "shuffle") shuffle(ps.deck, s.rng);
       break;
-    case "bench": for (const id of ids) if (!addToBench(s, owner, id)) ps.discard.push(id); break;
+    case "bench":
+      for (const id of ids) {
+        const p = addToBench(s, owner, id);
+        if (!p) ps.discard.push(id); else { log(s, `P${owner} puts ${defOf(id).name} onto the Bench`); fireOnBenched(run, p, owner, false); }
+      }
+      break;
     default: throw new Error(`cannot place cards into ${to}`);
   }
 }
 
 // ------------------------------------------------------------------ damage
-export interface DmgOpts { attacker?: PokemonInPlay; wr: boolean }
+export interface DmgOpts { attacker?: PokemonInPlay; wr: boolean; /** damage done by an attack (static damage prevention applies) */ byAttack?: boolean; /** skip all defender-side effects (Shred) */ ignoreEffects?: boolean }
 /** Apply damage to a Pokémon: weakness/resistance (if wr), prevention & reduction markers. Returns damage dealt. */
 export function applyDamage(s: GameState, target: PokemonInPlay, amount: number, o: DmgOpts): number {
   if (amount <= 0) return 0;
   let d = amount;
   if (o.wr) d = weaknessResistance(o.attacker, target, d);
-  if (hasMarker(target.markers, "preventDamage")) d = 0;
-  d += markerSum(target.markers, "mod:damageTaken") + staticModifiers(toolDef(target), "damageTaken");
+  if (!o.ignoreEffects) {
+    if (hasMarker(target.markers, "preventDamage") || (o.byAttack && staticPreventsDamage(s, target))) return 0;
+    d += markerSum(target.markers, "mod:damageTaken") + staticStat(s, target, "damageTaken");
+  }
   d = Math.max(0, d);
   target.damage += d;
   return d;
@@ -280,11 +322,15 @@ function expiry(s: GameState, d: Duration): number | undefined | "now" {
     case "whileInPlay": return undefined;
   }
 }
-function mark(ctx: Ctx, who: Selector, key: string, d: Duration, value?: number): void {
+/** An attack's effects on an opposing Pokémon that has "prevent all effects of attacks" (Dunsparce Dig) are ignored. */
+const shielded = (ctx: Ctx, p: PokemonInPlay): boolean =>
+  ctx.kind === "attack" && !ctx.ignoreDefEffects && hasMarker(p.markers, "preventEffects") && findPokemon(S(ctx), p.iid)?.player !== ctx.player;
+function mark(ctx: Ctx, who: Selector, key: string, d: Duration, value?: number, againstFilter?: CardFilter): void {
   const e = expiry(S(ctx), d);
   if (e === "now") return;
   for (const p of selectPokemon(ctx, who)) {
-    const m: Marker = { key, value, expiresAfterTurn: e };
+    if (shielded(ctx, p)) continue;
+    const m: Marker = { key, value, expiresAfterTurn: e, ...(againstFilter ? { againstFilter } : {}) };
     p.markers.push(m);
   }
 }
@@ -322,8 +368,11 @@ export function runEffect(ctx: Ctx, e: Effect): void {
       for (const t of selectPokemon(ctx, e.to)) {
         const loc = findPokemon(s, t.iid)!;
         const isDefActive = loc.player !== ctx.player && loc.where === "active";
-        if (ctx.kind === "attack" && isDefActive && e.weakRes !== false) ctx.dmg = (ctx.dmg ?? 0) + amt;
-        else applyDamage(s, t, amt, { attacker, wr: e.weakRes === true && isDefActive });
+        if (ctx.kind === "attack" && isDefActive && e.weakRes !== false) { ctx.dmg = (ctx.dmg ?? 0) + amt; if (e.effects === false) ctx.ignoreDefEffects = true; }
+        else {
+          const dealt = applyDamage(s, t, amt, { attacker, wr: e.weakRes === true && isDefActive, byAttack: ctx.kind === "attack", ignoreEffects: e.effects === false });
+          if (ctx.kind === "attack") fireOnDamaged(ctx.run, attacker, t, dealt);
+        }
       }
       return;
     }
@@ -334,13 +383,58 @@ export function runEffect(ctx: Ctx, e: Effect): void {
       return;
     case "counters": {
       const n = evalAmount(ctx, e.n);
-      const targets = selectPokemon(ctx, e.to);
+      const targets = selectPokemon(ctx, e.to).filter((t) => e.remove || !shielded(ctx, t));
       if (!targets.length) return;
       if (e.remove) { for (const t of targets) t.damage = Math.max(0, t.damage - n * 10); return; }
       if (!e.distribute || targets.length === 1) { for (const t of targets) t.damage += n * 10; return; }
-      for (let i = 0; i < n; i++) {
-        const [id] = ask(ctx.run, { player: ctx.player, kind: "pokemon", options: targets.map((t) => t.iid), min: 1, max: 1, prompt: "place a damage counter" });
-        byIid(s, id!).damage += 10;
+      if (!(n > 0) || n === Infinity) return;
+      const picks = ask(ctx.run, { player: ctx.player, kind: "distribute", options: targets.map((t) => t.iid), min: n, max: n, prompt: `distribute ${n} damage counters` });
+      for (const pk of picks) { const [id, c] = pk.split("="); byIid(s, id!).damage += Number(c) * 10; }
+      return;
+    }
+    case "moveCounters": {
+      const [from] = selectPokemon(ctx, e.from);
+      const [to] = selectPokemon(ctx, e.to);
+      if (!from || !to || from === to) { ctx.didPrev = false; return; }
+      const { min, max } = countRange(ctx, e.n);
+      const hi = Math.min(max, from.damage / 10), lo = Math.min(min, hi);
+      const opts: string[] = [];
+      for (let k = lo; k <= hi; k++) opts.push(String(k));
+      const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: opts, min: 1, max: 1, prompt: "damage counters to move" });
+      const k = Number(pick ?? 0);
+      from.damage -= k * 10; to.damage += k * 10;
+      ctx.didPrev = k > 0;
+      log(s, `${k} damage counter(s) moved from ${topDef(from).name} to ${topDef(to).name}`);
+      return;
+    }
+    case "searchSplit": {
+      for (const pl of players(ctx, e.player)) {
+        const ps = s.players[pl];
+        const arr = zoneArr(ps, e.zone ?? "deck");
+        const cands = arr.filter((c) => cardMatches(c, e.filter));
+        const key = (c: string) => (e.distinct === "name" ? defOf(c).name : (defOf(c).types ?? []).join(""));
+        const picked: string[] = [];
+        for (let i = 0; i < e.upTo; i++) {
+          const opts = cands.filter((c) => !picked.includes(c) && (!e.distinct || !picked.some((q) => key(q) === key(c))));
+          if (!opts.length) break;
+          const [c] = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: 0, max: 1, prompt: "search" });
+          if (!c) break;
+          picked.push(c);
+        }
+        for (const c of picked) removeItem(arr, c);
+        if (picked.length) log(s, `P${pl} reveals ${picked.map((c) => defOf(c).name).join(", ")}`);
+        let toHand = picked, toAttach: string[] = [];
+        if (picked.length === 2) {
+          const [h] = ask(ctx.run, { player: ctx.player, kind: "cards", options: picked, min: 1, max: 1, prompt: "put into your hand (the other is attached)" });
+          toHand = [h!]; toAttach = picked.filter((c) => c !== h);
+        }
+        ps.hand.push(...toHand);
+        if (toAttach.length) {
+          const [target] = selectPokemon(ctx, e.b.attachTo);
+          if (target) target.energy.push(...toAttach); else ps.hand.push(...toAttach);
+        }
+        if (e.shuffle !== false) shuffle(ps.deck, s.rng);
+        ctx.didPrev = picked.length > 0;
       }
       return;
     }
@@ -379,10 +473,15 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     case "shuffle": for (const pl of players(ctx, e.player)) shuffle(zoneArr(s.players[pl], e.zone), s.rng); return;
     case "search": {
       for (const pl of players(ctx, e.player)) {
-        const { ids } = selectCards(ctx, { ...e.sel, player: "self" }, pl, true);
+        let sel: CardSel = { ...e.sel, player: "self" };
+        if (e.to === "bench") { // can't put more cards onto the Bench than there is room for
+          const free = Math.max(0, s.rules.benchSize - s.players[pl].bench.length);
+          if (countRange(ctx, sel.count).max > free) sel = { ...sel, count: { k: "upTo", n: free } };
+        }
+        const { ids } = selectCards(ctx, sel, pl, true);
         removeCards(s, pl, e.sel.zone, ids);
         if (e.to === "attached") throw new Error("search→attached: use attachEnergy");
-        placeCards(s, pl, e.to, ids);
+        placeCards(ctx.run, pl, e.to, ids);
         if (e.shuffle) shuffle(s.players[pl].deck, s.rng);
         log(s, `P${pl} searches ${e.sel.zone}: ${ids.length ? ids.map((i) => defOf(i).name).join(", ") : "nothing"}`);
         ctx.didPrev = ids.length > 0;
@@ -400,10 +499,27 @@ export function runEffect(ctx: Ctx, e: Effect): void {
       return;
     }
     case "move": {
+      if (e.sel.zone === "play" || e.sel.zone === "active" || e.sel.zone === "bench") {
+        // move whole in-play Pokémon stacks (Pokémon + evolutions + Energy + Tool) to another zone
+        const pokes = e.sel.from ? selectPokemon(ctx, e.sel.from) : selectPokemon(ctx, { s: "pick", player: e.sel.player, where: e.sel.zone, filter: e.sel.filter, count: e.sel.count, chooser: e.sel.chooser });
+        for (const p of pokes) {
+          const loc = findPokemon(s, p.iid);
+          if (!loc) continue;
+          const ps = s.players[loc.player];
+          if (ps.active === p) ps.active = null; else removeItem(ps.bench, p);
+          const cards = allCardsOf(p);
+          if (e.shuffleFirst) shuffle(cards, s.rng);
+          log(s, `P${loc.player} moves ${topDef(p).name} and ${cards.length - 1} attached/stacked card(s) to ${e.to}`);
+          placeCards(ctx.run, loc.player, e.to, cards, e.position);
+          ctx.didPrev = true;
+        }
+        return;
+      }
       for (const pl of players(ctx, e.sel.player)) {
         const { ids } = selectCards(ctx, e.sel, pl, false);
         removeCards(s, pl, e.sel.zone, ids);
-        placeCards(s, pl, e.to, ids, e.position);
+        if (e.shuffleFirst) shuffle(ids, s.rng);
+        placeCards(ctx.run, pl, e.to, ids, e.position);
         ctx.didPrev = ids.length > 0;
       }
       return;
@@ -414,7 +530,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
         const n = evalAmount(ctx, e.n);
         const top = zoneArr(ps, e.zone).slice(0, n);
         const take = e.take === undefined ? 0 : evalAmount(ctx, e.take);
-        const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: 0, max: Math.min(take, top.length), prompt: "take cards" });
+        const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: Math.min(take, top.length), max: Math.min(take, top.length), prompt: "take cards" });
         for (const t of taken) removeItem(zoneArr(ps, e.zone), t);
         ps.hand.push(...taken);
         const rest = top.filter((t) => !taken.includes(t));
@@ -432,7 +548,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     }
     case "attachEnergy": {
       const owner = ctx.player;
-      const { ids } = selectCards(ctx, e.sel, owner, true);
+      const { ids } = selectCards(ctx, e.sel, owner, false); // exact counts are mandatory ("Attach a Basic Energy card"); `upTo` counts stay optional
       if (!ids.length) { ctx.didPrev = false; return; }
       const [target] = selectPokemon(ctx, e.to);
       if (!target) return;
@@ -457,7 +573,10 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     case "putOnBench": {
       const { ids } = selectCards(ctx, e.sel, ctx.player, true);
       removeCards(s, ctx.player, e.sel.zone, ids);
-      for (const id of ids) if (isBasicPokemon(defOf(id))) { if (!addToBench(s, ctx.player, id)) s.players[ctx.player].discard.push(id); }
+      for (const id of ids) if (isBasicPokemon(defOf(id))) {
+        const p = addToBench(s, ctx.player, id);
+        if (!p) s.players[ctx.player].discard.push(id); else { log(s, `P${ctx.player} puts ${defOf(id).name} onto the Bench`); fireOnBenched(ctx.run, p, ctx.player, false); }
+      }
       if (e.sel.zone === "deck") shuffle(s.players[ctx.player].deck, s.rng);
       return;
     }
@@ -514,13 +633,101 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     case "modify": {
       if (e.stat === "hp" || e.stat === "retreat" || e.stat === "damageDealt" || e.stat === "damageTaken") {
         if (typeof e.value === "string") return notImplemented(e);
-        mark(ctx, e.who, `mod:${e.stat}`, e.duration, evalAmount(ctx, e.value));
+        mark(ctx, e.who, `mod:${e.stat}`, e.duration, evalAmount(ctx, e.value), e.stat === "damageDealt" ? e.againstFilter : undefined);
         return;
       }
       return notImplemented(e);
     }
-    case "tag": mark(ctx, { s: "self" }, `tag:${e.key}`, e.duration); return;
+    case "tag": {
+      mark(ctx, { s: "self" }, `tag:${e.key}`, e.duration);
+      const x = expiry(s, e.duration);
+      if (x !== "now") s.players[ctx.player].markers.push({ key: `tag:${e.key}`, expiresAfterTurn: x });
+      return;
+    }
+    case "copyAttack": {
+      if (ctx.copying) return; // a copied attack cannot itself copy
+      const [src] = selectPokemon(ctx, e.from, undefined, e.filter);
+      if (!src) return;
+      const atks = (topDef(src).attacks ?? []).map((a, i) => ({ a, i })).filter(({ a }) => !JSON.stringify(a.effect ?? null).includes('"copyAttack"'));
+      if (!atks.length) return;
+      const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: atks.map(({ i }) => String(i)), min: 1, max: 1, prompt: `choose an attack of ${topDef(src).name} to use` });
+      const a = topDef(src).attacks![Number(pick)]!;
+      log(s, `copies ${topDef(src).name}'s ${a.name}`);
+      ctx.copying = true;
+      ctx.dmg = a.damage && a.damage > 0 ? a.damage : null;
+      if (a.effect) runEffect(ctx, a.effect);
+      ctx.copying = false;
+      return;
+    }
     case "endTurn": ctx.endTurn = true; return;
-    case "evolve": case "copyAttack": case "useAgain": return notImplemented(e);
+    case "evolve": case "useAgain": return notImplemented(e);
   }
+}
+
+// ------------------------------------------------------------------ triggers
+/** Run every rule of `rules` whose trigger satisfies `match`, as `owner`, hosted by `host` (Pokémon or its attached Tool). */
+function runRules(run: Run, owner: PlayerId, host: PokemonInPlay | undefined, rules: Entry[] | undefined, match: (t: Trigger) => boolean, binds: Record<string, string[]>): void {
+  for (const en of rules ?? []) {
+    if (!match(en.trigger)) continue;
+    const ctx = newCtx(run, owner, "other", { self: host?.iid, attached: host?.iid });
+    Object.assign(ctx.binds, binds);
+    runEffect(ctx, en.effect);
+  }
+}
+/** Every rule-holder on the board: each Pokémon's card, its Tool, and the Stadium. */
+function holders(s: GameState): Array<{ owner: PlayerId; host?: PokemonInPlay; rules: Entry[] | undefined }> {
+  const out: Array<{ owner: PlayerId; host?: PokemonInPlay; rules: Entry[] | undefined }> = [];
+  for (const pl of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[pl])) {
+    out.push({ owner: pl, host: p, rules: topDef(p).rules });
+    if (p.tool) out.push({ owner: pl, host: p, rules: defOf(p.tool).rules });
+  }
+  if (s.stadium) out.push({ owner: s.stadium.owner, rules: defOf(s.stadium.iid).rules });
+  return out;
+}
+const whoseOk = (whose: PlayerRef, s: GameState, srcOwner: PlayerId, actor: PlayerId): boolean =>
+  whose === "both" ? true : whose === "self" ? srcOwner === actor : whose === "opp" ? srcOwner !== actor : actor === s.activePlayer;
+
+/** A Pokémon was placed on a Bench. `fromHand`: played from hand (onPlayToBench fromHand entries on that card); onPutOnBench rules of
+ *  all holders fire for any placement made during the placing player's own turn. Supplies ref `benched`. */
+export function fireOnBenched(run: Run, benched: PokemonInPlay, owner: PlayerId, fromHand: boolean): void {
+  const s = run.s;
+  const binds = { benched: [benched.iid] };
+  const here = () => !!findPokemon(s, benched.iid);
+  // an Ability-like own trigger: silenced by Ability locks
+  if (here() && !abilityLocked(s, benched)) runRules(run, owner, benched, topDef(benched).rules, (t) => t.t === "onPlayToBench" && t.fromHand === fromHand, binds);
+  if (owner !== s.activePlayer) return; // "during their turn"
+  for (const h of holders(s)) {
+    if (!here()) return;
+    runRules(run, h.owner, h.host, h.rules,
+      (t) => t.t === "onPutOnBench" && whoseOk(t.whose, s, h.owner, owner) && matchesFilter(topDef(benched), t.filter, pokemonFacts(benched)), binds);
+  }
+}
+/** After an opponent's attack damaged `target` (dealt > 0): fire its (and its Tool's) onDamaged rules. Supplies ref `attacker`. */
+export function fireOnDamaged(run: Run, attacker: PokemonInPlay | undefined, target: PokemonInPlay, dealt: number): void {
+  const s = run.s;
+  const loc = findPokemon(s, target.iid);
+  if (dealt <= 0 || !attacker || !loc) return;
+  const aloc = findPokemon(s, attacker.iid);
+  if (!aloc || aloc.player === loc.player) return;
+  const ko = target.damage >= maxHp(s, target);
+  const rules = [topDef(target).rules, target.tool ? defOf(target.tool).rules : undefined];
+  for (const r of rules)
+    runRules(run, loc.player, target, r, (t) => t.t === "onDamaged" && (!t.active || loc.where === "active") && (t.evenIfKO || !ko), { attacker: [attacker.iid] });
+}
+export function fireOnKnockedOut(run: Run, owner: PlayerId, p: PokemonInPlay): void {
+  const s = run.s;
+  const byAttack = owner !== s.activePlayer && !!run.attackKOs?.includes(p.iid);
+  const att = s.players[s.activePlayer].active;
+  const binds: Record<string, string[]> = byAttack && att ? { attacker: [att.iid] } : {};
+  for (const r of [topDef(p).rules, p.tool ? defOf(p.tool).rules : undefined])
+    runRules(run, owner, p, r, (t) => t.t === "onKnockedOut" && (!t.byAttack || byAttack), binds);
+}
+export function fireOnEvolve(run: Run, owner: PlayerId, p: PokemonInPlay): void {
+  runRules(run, owner, p, topDef(p).rules, (t) => t.t === "onEvolve", {});
+}
+/** End of the active player's turn: rules with `endOfTurn` (whose = relative to the rule owner). */
+export function fireEndOfTurn(run: Run): void {
+  const s = run.s;
+  for (const h of holders(s))
+    runRules(run, h.owner, h.host, h.rules, (t) => t.t === "endOfTurn" && (t.whose === "self" ? h.owner === s.activePlayer : t.whose === "opp" ? h.owner !== s.activePlayer : true), {});
 }

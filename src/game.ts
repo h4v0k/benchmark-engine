@@ -1,7 +1,7 @@
 import type { Action } from "./actions.js";
-import { actionKey, decider, enumerate } from "./actions.js";
+import { abilityIsNameLimited, actionKey, decider, enumerate } from "./actions.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, prizeValueOf, registerCards, type CardDef } from "./cards/model.js";
-import { NeedChoice, Run, applyDamage, ask, coin, newCtx, runEffect, validPicks } from "./interpreter.js";
+import { NeedChoice, Run, applyDamage, ask, coin, fireEndOfTurn, fireOnBenched, fireOnDamaged, fireOnEvolve, fireOnKnockedOut, newCtx, runEffect, validPicks } from "./interpreter.js";
 import { flip, makeRng, shuffle } from "./rng.js";
 import { attackerBonus, maxHp } from "./rules.js";
 import {
@@ -104,8 +104,14 @@ function checkup(run: Run): void {
 function resolveKOs(run: Run): void {
   const s = run.s;
   if (s.phase === "over") return;
-  const kos: Array<[PlayerId, PokemonInPlay]> = [];
-  for (const pl of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[pl])) if (p.damage >= maxHp(s, p)) kos.push([pl, p]);
+  const collect = (): Array<[PlayerId, PokemonInPlay]> => {
+    const out: Array<[PlayerId, PokemonInPlay]> = [];
+    for (const pl of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[pl])) if (p.damage >= maxHp(s, p)) out.push([pl, p]);
+    return out;
+  };
+  let kos = collect();
+  for (const [pl, p] of kos) fireOnKnockedOut(run, pl, p); // before removal; may add more damage
+  kos = collect();
   for (const [pl, p] of kos) {
     log(s, `P${pl} ${topDef(p).name} is Knocked Out`);
     const prizes = prizeValueOf(topDef(p));
@@ -142,6 +148,7 @@ function endTurnSequence(run: Run): void {
   const s = run.s;
   if (s.phase === "over") return;
   log(s, `P${s.activePlayer} ends turn`);
+  fireEndOfTurn(run);
   expireMarkers(s);
   checkup(run);
   resolveKOs(run);
@@ -157,7 +164,11 @@ function playTrainer(run: Run, pl: PlayerId, card: string, kind: "item" | "suppo
   removeItem(ps.hand, card);
   log(s, `P${pl} plays ${defOf(card).name}`);
   const entry = defOf(card).rules?.find((r) => r.trigger.t === "play");
-  if (entry) runEffect(newCtx(run, pl, kind), entry.effect);
+  if (entry) {
+    const ctx = newCtx(run, pl, kind);
+    if (entry.trigger.t === "play" && entry.trigger.cost) runEffect(ctx, entry.trigger.cost); // cost is paid (via choices) before the effect
+    runEffect(ctx, entry.effect);
+  }
   ps.discard.push(card);
   resolveKOs(run);
 }
@@ -179,9 +190,10 @@ function executeAttack(run: Run, pl: PlayerId, idx: number): void {
   const target = s.players[other(pl)].active;
   if (!ctx.cancelled && ctx.dmg !== null && target) {
     let raw = ctx.dmg + ctx.mods;
-    if (raw > 0) raw += attackerBonus(atk);
-    const dealt = applyDamage(s, target, raw, { attacker: atk, wr: true });
+    if (raw > 0) raw += attackerBonus(s, atk, target);
+    const dealt = applyDamage(s, target, raw, { attacker: atk, wr: true, byAttack: true, ignoreEffects: ctx.ignoreDefEffects });
     log(s, `${topDef(target).name} takes ${dealt}`);
+    fireOnDamaged(run, atk, target, dealt);
   }
 }
 
@@ -192,8 +204,11 @@ function execute(run: Run, a: Action): void {
   switch (a.type) {
     case "playBasicToBench":
       removeItem(ps.hand, a.card);
-      ps.bench.push(newPokemon(a.card, s.turn));
+      const np = newPokemon(a.card, s.turn);
+      ps.bench.push(np);
       log(s, `P${pl} benches ${defOf(a.card).name}`);
+      fireOnBenched(run, np, pl, true);
+      resolveKOs(run);
       return;
     case "evolve": {
       const t = findPokemon(s, a.target)!.p;
@@ -204,6 +219,8 @@ function execute(run: Run, a: Action): void {
       t.status = { asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false };
       t.markers = []; t.usedAbilities = [];
       log(s, `P${pl} evolves into ${defOf(a.card).name}`);
+      fireOnEvolve(run, pl, t);
+      resolveKOs(run);
       return;
     }
     case "attachEnergy": {
@@ -231,8 +248,10 @@ function execute(run: Run, a: Action): void {
       const p = findPokemon(s, a.pokemon)!.p;
       const ab = topDef(p).abilities![a.abilityIndex]!;
       if (ab.limit === "oncePerGame") ps.usedGameAbilities.push(ab.name); else p.usedAbilities.push(ab.name);
+      if (abilityIsNameLimited(ab)) ps.flags.abilityNamesUsed.push(ab.name);
       log(s, `P${pl} uses ability ${ab.name}`);
       const ctx = newCtx(run, pl, "ability", { self: p.iid });
+      if (ab.trigger?.t === "ability" && ab.trigger.costToUse) runEffect(ctx, ab.trigger.costToUse); // cost first, via choices
       runEffect(ctx, ab.effect);
       resolveKOs(run);
       if (ctx.endTurn) endTurnSequence(run);
@@ -249,6 +268,8 @@ function execute(run: Run, a: Action): void {
     }
     case "attack":
       executeAttack(run, pl, a.attackIndex);
+      run.attackKOs = [];
+      for (const q of [0, 1] as PlayerId[]) for (const p of inPlay(s.players[q])) if (p.damage >= maxHp(s, p)) run.attackKOs.push(p.iid);
       resolveKOsThenEnd(run);
       return;
     case "endTurn": endTurnSequence(run); return;

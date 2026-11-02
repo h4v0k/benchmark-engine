@@ -1,0 +1,46 @@
+{
+  "id": "sv5-128",
+  "name": "Dunsparce",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Basic"
+  ],
+  "hp": "60",
+  "types": [
+    "Colorless"
+  ],
+  "attacks": [
+    {
+      "name": "Gnaw",
+      "cost": [
+        "Colorless"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "10",
+      "text": ""
+    },
+    {
+      "name": "Dig",
+      "cost": [
+        "Colorless",
+        "Colorless"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "30",
+      "text": "Flip a coin. If heads, during your opponent's next turn, prevent all damage from and effects of attacks done to this Pokémon."
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "regulationMark": "H",
+  "number": "128",
+  "rarity": "Common",
+  "set": {
+    "id": "sv5",
+    "ptcgoCode": "TEF"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "sv6-130",
+  "name": "Dragapult ex",
+  "supertype": "Pokémon",
+  "subtypes": [
+    "Stage 2",
+    "Tera",
+    "ex"
+  ],
+  "hp": "320",
+  "types": [
+    "Dragon"
+  ],
+  "evolvesFrom": "Drakloak",
+  "attacks": [
+    {
+      "name": "Jet Headbutt",
+      "cost": [
+        "Colorless"
+      ],
+      "convertedEnergyCost": 1,
+      "damage": "70",
+      "text": ""
+    },
+    {
+      "name": "Phantom Dive",
+      "cost": [
+        "Fire",
+        "Psychic"
+      ],
+      "convertedEnergyCost": 2,
+      "damage": "200",
+      "text": "Put 6 damage counters on your opponent's Benched Pokémon in any way you like."
+    }
+  ],
+  "rules": [
+    "As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks (both yours and your opponent's).",
+    "Pokémon ex rule: When your Pokémon ex is Knocked Out, your opponent takes 2 Prize cards.",
+    "Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks (both yours and your opponent's)."
+  ],
+  "retreatCost": [
+    "Colorless"
+  ],
+  "regulationMark": "H",
+  "number": "130",
+  "rarity": "Double Rare",
+  "set": {
+    "id": "sv6",
+    "ptcgoCode": "TWM"
+  }
+}

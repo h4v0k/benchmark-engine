@@ -1,0 +1,19 @@
+{
+  "id": "me1-119",
+  "name": "Lillie's Determination",
+  "supertype": "Trainer",
+  "subtypes": [
+    "Supporter"
+  ],
+  "rules": [
+    "Shuffle your hand into your deck. Then, draw 6 cards. If you have exactly 6 Prize cards remaining, draw 8 cards instead.",
+    "You may play only 1 Supporter card during your turn."
+  ],
+  "regulationMark": "I",
+  "number": "119",
+  "rarity": "Uncommon",
+  "set": {
+    "id": "me1",
+    "ptcgoCode": "MEG"
+  }
+}
