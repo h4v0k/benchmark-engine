@@ -1,6 +1,6 @@
 import type { Condition, Effect } from "./dsl/types.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, isEnergy, isPokemon, matchesFilter, type AbilityDef, type CardDef } from "./cards/model.js";
-import { countRange, evalCond, newCtx, pickCandidates, pokemonFacts, type Run } from "./interpreter.js";
+import { countRange, evalCond, evolvePairs, newCtx, pickCandidates, pokemonFacts, type Run } from "./interpreter.js";
 import { abilityLocked, withStaticSnapshot } from "./statics.js";
 import { canPay, isFirstTurnOfGame, providedEnergy, retreatCostOf } from "./rules.js";
 import { hasMarker, inPlay, logText, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "./state.js";
@@ -77,6 +77,7 @@ function effectUsable(s: GameState, pl: PlayerId, e: Effect): boolean {
       && pickCandidates(newCtx({ s, answers: [], idx: 0 }, pl, "other"), e.sel).length === 0) return false;
     return effectUsable(s, pl, e.then);
   }
+  if (e.e === "evolve") return evolvePairs(newCtx({ s, answers: [], idx: 0 }, pl, "item"), e).length > 0;
   if (e.e === "switch") {
     const target = e.player === "opp" ? other(pl) : e.player === "active-player" ? s.activePlayer : pl;
     const ps = s.players[target];

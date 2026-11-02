@@ -93,3 +93,51 @@ by own turn 3 is only 1.1: the list has 8 Basic Energy (2 of them Darkness), so 
 does not mulligan-evaluate / dig for Energy (Crispin, Rosa's Encouragement, Ultra Ball for Energy) with that goal, does not hold Dreepy back from the
 Active slot (it is often KO'd early; 7.5% of games never reach Dragapult ex), and N's Zoroark ex's pilot often repeats a zero-damage Night Joker for many
 turns (no copy source powered), which flatters Dragapult in the matchup. Tempo-based findings should still be read with a pilot-skill caveat.
+
+### Pilot tempo, round 2: setup policy (M3d-1)
+
+Measured pilot misplays (Dragapult vs Zoroark): the search pilot played Crispin by own turn 3 in only 11/40 games, picked Boss's Orders with nothing to KO on own turn 2
+(13% of games), and Energy on the Dreepy/Drakloak/Dragapult line by own turn 3 averaged ~1.1 for both pilots. Known-answer positions for these are in `docs/DECISIONS.md`
+(`src/test/decisions.test.ts`, 14 tests = 7 positions x 2 pilots; before the fixes greedy passed 2/7 and search 5/7, after: 7/7 and 7/7).
+
+Changes (pilots only; no engine rule changed), all in `src/agents/tempo.ts` and used by both pilots:
+* greedy: Supporters are ranked (KO gust > Crispin for a short line > draw > other); a draw Supporter waits for the Items; Energy targeting is the shared `mainAttach`
+  (+ `holdForLine`: keep R/P Energy in hand until the Dragapult line is on the board); Crispin's choices and Pokemon-search picks (Poffin, Ultra Ball, ...) use the shared
+  `preferredChoice` (previously Poffin / Ultra Ball / Crispin picks were arbitrary: the largest single gain, Dragapult ex never reached 7.5% -> 4.5%).
+* search: Boss's Orders without a KO is pruned from the candidate set and only the best-ranked Supporter play is kept (`pruneSupporters`, narrow: Supporters and held Energy only);
+  Crispin for a short line / a draw Supporter with no Items left to play are played without searching (`policySupporter`, like the existing main-line evolution), the line Basic is
+  benched without searching (`mainLineBasic`), and Crispin / Poffin / Ultra Ball pending choices are answered by `preferredChoice` instead of being explored by UCT.
+  rolloutTurns stays 2; a larger early-game `HW.tempo` weight was tried (x1.5 on game turns <= 8) and made search weaker (80% vs 84%), so it was dropped.
+* Not done: "don't pick a 0-damage Night Joker when a damaging attack exists": N's Zoroark ex has no other attack, the real gap there is the retreat/promote decision (not cheap).
+
+| Dragapult ex player, own turn (greedy 200 games, search:fast 40 games) | greedy before | greedy after | search before | search after |
+|---|---|---|---|---|
+| first Drakloak, median [p25-p75] | 2 [2-5] | 2 [2-2] | 3 [2-6] | 2 [2-4] |
+| first Dragapult ex | 4 [3-8] | 4 [3-6] | 5 [4-8] | 4 [3-6] |
+| Dragapult ex never reached | 7.5% | 4.5% | 7.5% | 0% |
+| first Dragapult ex attack | 5 [3-10] | 5 [3-10] | 7 [4-9] | 5 [3-7] |
+| attacked by own T3 / T4 (of all games) | - | 32% / 40% | - | 30% / 48% |
+| Crispin played by own T3 (when in hand by T3) | 35% (93%) | 36% (92%) | 43% (89%) | 43% (85%) |
+| Boss's Orders on own T2 without a KO | 0% | 0% | 13% | 0% |
+| avg Energy on the line at end of own T3 (anywhere) | 1.15 | 1.65 (1.95) | 0.97 | 1.48 (1.93) |
+| Dragapult win vs Zoroark | 87% | 91.5% | 100% | 100% |
+| games/s | 151 | 142 | 0.8 | 0.9 |
+
+Notes: "Crispin by T3" is capped by drawing one of the 2 copies (only 38% of games have it in hand by then); the conditional rate was already ~92%. Energy on the line is capped
+by the 8 Basic Energy (about 2.3 Energy seen by T3) and one attach per turn; the line now gets 85% of the Energy on the board. The median first Dragapult ex attack is still
+own turn 5 (40-48% of games attack by T4): the remaining delay is drawing Dreepy + Drakloak + Dragapult ex + both Energy types, which needs more draw/search play, not a better choice among the cards held.
+search:fast vs greedy (100 games) is now 84% (was 87-89% against the old greedy; the weak pairing is search-as-Zoroark vs the stronger greedy-Dragapult, 11/24), so
+`src/test/search.test.ts` asserts >= 70% (comment there). golden-50.json was regenerated because greedy's behaviour changed (engine unchanged); the hidden-information
+test now probes seed 25 (seed 24's greedy game became too short for its 6 probe turns).
+
+## Rare Candy (M3d-2, 2026-10-14)
+
+Rare Candy (`me1-125`, MEG, regulation mark I, newest Standard-legal printing) is implemented through the DSL `evolve` node (`skipStage: true`): choose a Basic in play (not put into play
+this turn), then a Stage 2 in hand whose `evolvesFrom` Stage 1 itself `evolvesFrom` that Basic (checked against the registered card defs); not on either player's first turn. Side effects are the
+normal evolution ones (`applyEvolution`, shared with the `evolve` action): damage / Energy / Tool kept, Special Conditions and markers cleared, `evolvedThisTurn`, `onEvolve` rules. The Item is only
+offered when some (Basic, Stage 2) pair qualifies. Experiment: `experiments/dragapult-rare-candy.json` (three Candy variants of the Recife list; greedy screen, `search:fast` confirm of the top 2).
+
+Pilot caveat: both pilots play Candy whenever a main-line pair exists (`candyPlay` in `src/agents/tempo.ts`, before any normal evolution so the Stage 1 is not spent on the Basic the Candy needs;
+search plays it without searching, like the main-line evolution; pending target / card choices use `preferredChoice`). They do not plan around holding a Candy for a later turn, do not
+mulligan-evaluate or search with the goal "Dreepy + Dragapult ex + Candy", and the Energy shortfall (R and P by own turn 2-3) still binds, so the pilots probably under-realise the card relative to a human who
+sequences Poffin, Candy and Crispin on purpose. Read Candy results as a lower bound on the card's tempo value for this pilot, not as a verdict on the card.

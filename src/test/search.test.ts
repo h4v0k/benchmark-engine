@@ -48,10 +48,13 @@ test("presets: defaults match the milestone spec", () => {
 });
 
 // ------------------------------------------------------------------ strength
-test("search (fast) beats greedy >= 85% over 100 games (seats and deck pairs alternate)", () => {
+// M3d-1: greedy got much stronger (setup policy: Crispin / Energy targeting / Poffin + Ultra Ball picks; Dragapult ex vs Zoroark greedy-vs-greedy 87% -> 91%), so search:fast
+// now wins 84% (was 87-89% against the old greedy; the weak pairing is search-as-Zoroark vs greedy-Dragapult). The assertion is relaxed to >= 70% (search must still win clearly);
+// the measured number is printed by report() below and recorded in docs/EXPERIMENTS.md.
+test("search (fast) beats greedy >= 70% over 100 games (seats and deck pairs alternate; was 85% before greedy's setup policy)", () => {
   const r = series(searchAgent(FAST_SEARCH), greedyAgent, 100, 1);
   report("fast vs greedy", r);
-  assert.ok(r.wins / r.games >= 0.85, `win rate ${pct(r.wins / r.games)}`);
+  assert.ok(r.wins / r.games >= 0.70, `win rate ${pct(r.wins / r.games)}`);
   assert.ok(r.ms / r.games < 4000, "fast preset should stay within a few seconds per game");
 });
 
@@ -90,7 +93,7 @@ function scramble(s: GameState, opp: PlayerId, seed: number, pooled: boolean): G
 test("hidden information: permuting the opponent's hidden cards does not change the search", () => {
   const cfg: Partial<SearchConfig> = { determinizations: 3, iterations: 10, rolloutTurns: 2 };
   // walk a greedy-vs-greedy game and probe the searcher's decisions at several points (no open choice)
-  let s = createGame(D, Z, 24); // a greedy-vs-greedy game long enough to reach the last probe turn (re-picked when greedy got faster)
+  let s = createGame(D, Z, 25); // a greedy-vs-greedy game long enough to reach the last probe turn (re-picked when greedy got faster: 24 -> 25)
   let guard = 0, probes = 0;
   const targets = [3, 6, 9, 12, 15, 18];
   while (s.phase !== "over" && probes < targets.length && guard++ < 5000) {

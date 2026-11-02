@@ -1,7 +1,7 @@
 import type { Action } from "./actions.js";
 import { abilityIsNameLimited, decider, enumerate, sameAction } from "./actions.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, prizeValueOf, registerCards, type CardDef } from "./cards/model.js";
-import { NeedChoice, Run, applyDamage, ask, coin, fireEndOfTurn, fireOnBenched, fireOnDamaged, fireOnEvolve, fireOnKnockedOut, newCtx, runEffect, validPicks } from "./interpreter.js";
+import { NeedChoice, Run, applyDamage, ask, coin, fireEndOfTurn, fireOnBenched, applyEvolution, fireOnDamaged, fireOnKnockedOut, newCtx, runEffect, validPicks } from "./interpreter.js";
 import type { CheckupResult, EventOf } from "./events.js";
 import { flip, makeRng, shuffle } from "./rng.js";
 import { attackerBonus, maxHp } from "./rules.js";
@@ -226,14 +226,7 @@ function execute(run: Run, a: Action): void {
     case "evolve": {
       const t = findPokemon(s, a.target)!.p;
       removeItem(ps.hand, a.card);
-      const fromId = t.iid, fromName = topDef(t).name;
-      t.below.push(t.iid);
-      t.iid = a.card;
-      t.evolvedThisTurn = true;
-      t.status = { asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false };
-      t.markers = []; t.usedAbilities = [];
-      emit(s, { type: "evolve", player: pl, from: fromId, to: a.card, fromName, toName: defOf(a.card).name });
-      fireOnEvolve(run, pl, t);
+      applyEvolution(run, pl, t, a.card);
       resolveKOs(run);
       return;
     }

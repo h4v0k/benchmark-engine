@@ -1,0 +1,1277 @@
+{
+  "name": "dragapult-rare-candy",
+  "stage": "confirm",
+  "arms": [
+    {
+      "name": "Dragapult ex (Recife 3rd place list)",
+      "change": null,
+      "mainAttacker": "Dragapult ex",
+      "matchups": [
+        {
+          "field": "Dragapult ex",
+          "weight": 0.780373831775701,
+          "n": 232,
+          "score": 0.5344827586206896,
+          "lo": 0.4702577180846033,
+          "hi": 0.5975844674068507,
+          "mech": {
+            "n": 232,
+            "avgTurns": 15.137931034482758,
+            "reasons": {
+              "prizes": 0.8405172413793079,
+              "no-pokemon": 0.14655172413793102,
+              "deckout": 0.01293103448275862
+            },
+            "kosPerGame": 3.1077586206896552,
+            "prizesPerGame": 3.521551724137931,
+            "firstKoTurn": 7.7542857142857144,
+            "mainAttackTurn": 8.073863636363637,
+            "mainAttackRate": 0.7586206896551724,
+            "deckOutRate": 0.01293103448275862,
+            "cards": {
+              "Drakloak": {
+                "copies": 4,
+                "drawnBy3": 0.6120689655172413,
+                "played": 0.9181034482758621,
+                "playedByN": 0.6637931034482759,
+                "avgFirstPlayTurn": 4.582159624413146,
+                "playedByOwn": [
+                  0,
+                  0.6637931034482759,
+                  0.7801724137931034,
+                  0.8405172413793104,
+                  0.8793103448275862,
+                  0.9051724137931034
+                ],
+                "avgFirstPlayOwnTurn": 2.5774647887323945,
+                "whenPlayed": {
+                  "n": 213,
+                  "score": 122
+                },
+                "whenNotPlayed": {
+                  "n": 19,
+                  "score": 2
+                }
+              },
+              "Poké Pad": {
+                "copies": 4,
+                "drawnBy3": 0.5818965517241379,
+                "played": 0.8405172413793104,
+                "playedByN": 0.3879310344827586,
+                "avgFirstPlayTurn": 6.158974358974359,
+                "playedByOwn": [
+                  0.21982758620689655,
+                  0.3879310344827586,
+                  0.5301724137931034,
+                  0.6336206896551724,
+                  0.6853448275862069,
+                  0.7586206896551724
+                ],
+                "avgFirstPlayOwnTurn": 3.364102564102564,
+                "whenPlayed": {
+                  "n": 195,
+                  "score": 114
+                },
+                "whenNotPlayed": {
+                  "n": 37,
+                  "score": 10
+                }
+              },
+              "Rare Candy": {
+                "copies": 0,
+                "drawnBy3": 0,
+                "played": 0,
+                "playedByN": 0,
+                "avgFirstPlayTurn": null,
+                "playedByOwn": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "avgFirstPlayOwnTurn": null,
+                "whenPlayed": {
+                  "n": 0,
+                  "score": 0
+                },
+                "whenNotPlayed": {
+                  "n": 232,
+                  "score": 124
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.177142857142857,
+            "mainAttackOwnTurn": 4.329545454545454,
+            "mainAttackByOwn": [
+              0,
+              0.3448275862068966,
+              0.5043103448275862
+            ]
+          }
+        },
+        {
+          "field": "N's Zoroark ex",
+          "weight": 0.2196261682242991,
+          "n": 232,
+          "score": 0.8793103448275862,
+          "lo": 0.8310993323893869,
+          "hi": 0.9151647080166068,
+          "mech": {
+            "n": 232,
+            "avgTurns": 19.487068965517242,
+            "reasons": {
+              "prizes": 0.9224137931034455,
+              "deckout": 0.025862068965517244,
+              "no-pokemon": 0.051724137931034496
+            },
+            "kosPerGame": 4.633620689655173,
+            "prizesPerGame": 5.301724137931035,
+            "firstKoTurn": 8.756880733944953,
+            "mainAttackTurn": 10.214611872146119,
+            "mainAttackRate": 0.9439655172413793,
+            "deckOutRate": 0,
+            "cards": {
+              "Drakloak": {
+                "copies": 4,
+                "drawnBy3": 0.603448275862069,
+                "played": 0.9655172413793104,
+                "playedByN": 0.646551724137931,
+                "avgFirstPlayTurn": 5.129464285714286,
+                "playedByOwn": [
+                  0,
+                  0.646551724137931,
+                  0.7931034482758621,
+                  0.8491379310344828,
+                  0.9051724137931034,
+                  0.9267241379310345
+                ],
+                "avgFirstPlayOwnTurn": 2.8169642857142856,
+                "whenPlayed": {
+                  "n": 224,
+                  "score": 203
+                },
+                "whenNotPlayed": {
+                  "n": 8,
+                  "score": 1
+                }
+              },
+              "Poké Pad": {
+                "copies": 4,
+                "drawnBy3": 0.603448275862069,
+                "played": 0.9094827586206896,
+                "playedByN": 0.43103448275862066,
+                "avgFirstPlayTurn": 7.516587677725118,
+                "playedByOwn": [
+                  0.1896551724137931,
+                  0.43103448275862066,
+                  0.5387931034482759,
+                  0.5991379310344828,
+                  0.6767241379310345,
+                  0.7327586206896551
+                ],
+                "avgFirstPlayOwnTurn": 4.009478672985782,
+                "whenPlayed": {
+                  "n": 211,
+                  "score": 191
+                },
+                "whenNotPlayed": {
+                  "n": 21,
+                  "score": 13
+                }
+              },
+              "Rare Candy": {
+                "copies": 0,
+                "drawnBy3": 0,
+                "played": 0,
+                "playedByN": 0,
+                "avgFirstPlayTurn": null,
+                "playedByOwn": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "avgFirstPlayOwnTurn": null,
+                "whenPlayed": {
+                  "n": 0,
+                  "score": 0
+                },
+                "whenNotPlayed": {
+                  "n": 232,
+                  "score": 204
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.63302752293578,
+            "mainAttackOwnTurn": 5.365296803652968,
+            "mainAttackByOwn": [
+              0,
+              0.31896551724137934,
+              0.5387931034482759
+            ]
+          }
+        }
+      ],
+      "overall": {
+        "est": 0.6102159200773445,
+        "se": 0.02600549124255553,
+        "lo": 0.5592460934396204,
+        "hi": 0.6611857467150686,
+        "mech": {
+          "n": 464,
+          "avgTurns": 16.09311553335482,
+          "reasons": {
+            "prizes": 0.8585038672252635,
+            "no-pokemon": 0.12572510473735096,
+            "deckout": 0.01577102803738318
+          },
+          "kosPerGame": 3.4428778601353534,
+          "prizesPerGame": 3.912524170157912,
+          "firstKoTurn": 7.974481816734239,
+          "mainAttackTurn": 8.544027968521473,
+          "mainAttackRate": 0.7993272639381245,
+          "deckOutRate": 0.010091040928134063,
+          "cards": {
+            "Drakloak": {
+              "copies": 4,
+              "drawnBy3": 0.6101756364808251,
+              "played": 0.9285167579761522,
+              "playedByN": 0.6600064453754433,
+              "avgFirstPlayTurn": 4.7023620500260135,
+              "avgFirstPlayOwnTurn": 2.6300651455461743,
+              "playedByOwn": [
+                0,
+                0.6600064453754433,
+                0.783012407347728,
+                0.8424105704157269,
+                0.8849903319368353,
+                0.9099057363841444
+              ],
+              "whenPlayed": {
+                "n": 437,
+                "score": 325
+              },
+              "whenNotPlayed": {
+                "n": 27,
+                "score": 3
+              }
+            },
+            "Poké Pad": {
+              "copies": 4,
+              "drawnBy3": 0.5866298743151789,
+              "played": 0.8556638736706415,
+              "playedByN": 0.39739767966484046,
+              "avgFirstPlayTurn": 6.457141770101863,
+              "avgFirstPlayOwnTurn": 3.5058440459600937,
+              "playedByOwn": [
+                0.21320093457943926,
+                0.39739767966484046,
+                0.5320657428295199,
+                0.6260473735095069,
+                0.6834514985497905,
+                0.7529407025459234
+              ],
+              "whenPlayed": {
+                "n": 406,
+                "score": 305
+              },
+              "whenNotPlayed": {
+                "n": 58,
+                "score": 23
+              }
+            },
+            "Rare Candy": {
+              "copies": 0,
+              "drawnBy3": 0,
+              "played": 0,
+              "playedByN": 0,
+              "avgFirstPlayTurn": null,
+              "avgFirstPlayOwnTurn": null,
+              "playedByOwn": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "whenPlayed": {
+                "n": 0,
+                "score": 0
+              },
+              "whenNotPlayed": {
+                "n": 464,
+                "score": 328
+              }
+            }
+          },
+          "firstKoOwnTurn": 4.277267059443172,
+          "mainAttackOwnTurn": 4.557023554583086,
+          "mainAttackByOwn": [
+            0,
+            0.3391475990976475,
+            0.5118836609732518
+          ]
+        }
+      }
+    },
+    {
+      "name": "2 Candy for Drakloak+Pad",
+      "change": "-1 Drakloak -1 Poké Pad +2 Rare Candy",
+      "mainAttacker": "Dragapult ex",
+      "matchups": [
+        {
+          "field": "Dragapult ex",
+          "weight": 0.780373831775701,
+          "n": 232,
+          "score": 0.4827586206896552,
+          "lo": 0.41926395273988243,
+          "hi": 0.5468149545143905,
+          "mech": {
+            "n": 232,
+            "avgTurns": 15.866379310344827,
+            "reasons": {
+              "prizes": 0.8534482758620665,
+              "no-pokemon": 0.1379310344827586,
+              "deckout": 0.008620689655172414
+            },
+            "kosPerGame": 2.896551724137931,
+            "prizesPerGame": 3.271551724137931,
+            "firstKoTurn": 8.112994350282486,
+            "mainAttackTurn": 8.615384615384615,
+            "mainAttackRate": 0.728448275862069,
+            "deckOutRate": 0.004310344827586207,
+            "cards": {
+              "Drakloak": {
+                "copies": 3,
+                "drawnBy3": 0.4870689655172414,
+                "played": 0.8879310344827587,
+                "playedByN": 0.5387931034482759,
+                "avgFirstPlayTurn": 5.179611650485437,
+                "playedByOwn": [
+                  0,
+                  0.5387931034482759,
+                  0.6810344827586207,
+                  0.7887931034482759,
+                  0.8318965517241379,
+                  0.8663793103448276
+                ],
+                "avgFirstPlayOwnTurn": 2.878640776699029,
+                "whenPlayed": {
+                  "n": 206,
+                  "score": 110
+                },
+                "whenNotPlayed": {
+                  "n": 26,
+                  "score": 2
+                }
+              },
+              "Poké Pad": {
+                "copies": 3,
+                "drawnBy3": 0.47844827586206895,
+                "played": 0.75,
+                "playedByN": 0.28448275862068967,
+                "avgFirstPlayTurn": 6.971264367816092,
+                "playedByOwn": [
+                  0.16810344827586207,
+                  0.28448275862068967,
+                  0.40948275862068967,
+                  0.5258620689655172,
+                  0.5905172413793104,
+                  0.6379310344827587
+                ],
+                "avgFirstPlayOwnTurn": 3.781609195402299,
+                "whenPlayed": {
+                  "n": 174,
+                  "score": 101
+                },
+                "whenNotPlayed": {
+                  "n": 58,
+                  "score": 11
+                }
+              },
+              "Rare Candy": {
+                "copies": 2,
+                "drawnBy3": 0.3577586206896552,
+                "played": 0.34913793103448276,
+                "playedByN": 0.09482758620689655,
+                "avgFirstPlayTurn": 8.222222222222221,
+                "playedByOwn": [
+                  0,
+                  0.09482758620689655,
+                  0.15086206896551724,
+                  0.19827586206896552,
+                  0.2543103448275862,
+                  0.28879310344827586
+                ],
+                "avgFirstPlayOwnTurn": 4.432098765432099,
+                "whenPlayed": {
+                  "n": 81,
+                  "score": 44
+                },
+                "whenNotPlayed": {
+                  "n": 151,
+                  "score": 68
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.350282485875706,
+            "mainAttackOwnTurn": 4.615384615384615,
+            "mainAttackByOwn": [
+              0.04741379310344827,
+              0.27155172413793105,
+              0.40948275862068967
+            ]
+          }
+        },
+        {
+          "field": "N's Zoroark ex",
+          "weight": 0.2196261682242991,
+          "n": 232,
+          "score": 0.8318965517241379,
+          "lo": 0.7784586663802844,
+          "hi": 0.8745223689749602,
+          "mech": {
+            "n": 232,
+            "avgTurns": 19.728448275862068,
+            "reasons": {
+              "prizes": 0.9051724137931008,
+              "no-pokemon": 0.06465517241379312,
+              "deckout": 0.030172413793103453
+            },
+            "kosPerGame": 4.482758620689655,
+            "prizesPerGame": 5.103448275862069,
+            "firstKoTurn": 9.04109589041096,
+            "mainAttackTurn": 10.828703703703704,
+            "mainAttackRate": 0.9310344827586207,
+            "deckOutRate": 0.008620689655172414,
+            "cards": {
+              "Drakloak": {
+                "copies": 3,
+                "drawnBy3": 0.4956896551724138,
+                "played": 0.9612068965517241,
+                "playedByN": 0.5129310344827587,
+                "avgFirstPlayTurn": 6.143497757847534,
+                "playedByOwn": [
+                  0,
+                  0.5129310344827587,
+                  0.6939655172413793,
+                  0.7801724137931034,
+                  0.8362068965517241,
+                  0.875
+                ],
+                "avgFirstPlayOwnTurn": 3.3228699551569507,
+                "whenPlayed": {
+                  "n": 223,
+                  "score": 191
+                },
+                "whenNotPlayed": {
+                  "n": 9,
+                  "score": 2
+                }
+              },
+              "Poké Pad": {
+                "copies": 3,
+                "drawnBy3": 0.521551724137931,
+                "played": 0.8706896551724138,
+                "playedByN": 0.34051724137931033,
+                "avgFirstPlayTurn": 8.782178217821782,
+                "playedByOwn": [
+                  0.14655172413793102,
+                  0.34051724137931033,
+                  0.46120689655172414,
+                  0.5517241379310345,
+                  0.5905172413793104,
+                  0.625
+                ],
+                "avgFirstPlayOwnTurn": 4.643564356435643,
+                "whenPlayed": {
+                  "n": 202,
+                  "score": 171
+                },
+                "whenNotPlayed": {
+                  "n": 30,
+                  "score": 22
+                }
+              },
+              "Rare Candy": {
+                "copies": 2,
+                "drawnBy3": 0.36637931034482757,
+                "played": 0.38362068965517243,
+                "playedByN": 0.06896551724137931,
+                "avgFirstPlayTurn": 11.07865168539326,
+                "playedByOwn": [
+                  0,
+                  0.06896551724137931,
+                  0.1206896551724138,
+                  0.16810344827586207,
+                  0.19827586206896552,
+                  0.24568965517241378
+                ],
+                "avgFirstPlayOwnTurn": 5.775280898876405,
+                "whenPlayed": {
+                  "n": 89,
+                  "score": 78
+                },
+                "whenNotPlayed": {
+                  "n": 143,
+                  "score": 115
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.776255707762557,
+            "mainAttackOwnTurn": 5.666666666666667,
+            "mainAttackByOwn": [
+              0.05603448275862069,
+              0.3232758620689655,
+              0.49137931034482757
+            ]
+          }
+        }
+      ],
+      "overall": {
+        "est": 0.5594384466645183,
+        "se": 0.02617867759238644,
+        "lo": 0.5081291810158342,
+        "hi": 0.6107477123132024,
+        "mech": {
+          "n": 464,
+          "avgTurns": 16.714590718659363,
+          "reasons": {
+            "prizes": 0.8648082500805647,
+            "no-pokemon": 0.12183773767321945,
+            "deckout": 0.013354012246213343
+          },
+          "kosPerGame": 3.2449242668385434,
+          "prizesPerGame": 3.6738841443764105,
+          "firstKoTurn": 8.316829735263974,
+          "mainAttackTurn": 9.101487405809836,
+          "mainAttackRate": 0.7729415082178537,
+          "deckOutRate": 0.005257009345794393,
+          "cards": {
+            "Drakloak": {
+              "copies": 3,
+              "drawnBy3": 0.4889622945536578,
+              "played": 0.9040243312922979,
+              "playedByN": 0.5331131163390268,
+              "avgFirstPlayTurn": 5.39130626285001,
+              "avgFirstPlayOwnTurn": 2.9762051289771705,
+              "playedByOwn": [
+                0,
+                0.5331131163390268,
+                0.6838744763132453,
+                0.7868997744118595,
+                0.8328432162423461,
+                0.8682726393812441
+              ],
+              "whenPlayed": {
+                "n": 429,
+                "score": 301
+              },
+              "whenNotPlayed": {
+                "n": 35,
+                "score": 4
+              }
+            },
+            "Poké Pad": {
+              "copies": 3,
+              "drawnBy3": 0.48791492104415085,
+              "played": 0.7765066065098293,
+              "playedByN": 0.2967893973573961,
+              "avgFirstPlayTurn": 7.368988437677155,
+              "avgFirstPlayOwnTurn": 3.970917104601211,
+              "playedByOwn": [
+                0.16337012568482115,
+                0.2967893973573961,
+                0.4208427328391879,
+                0.5315420560747663,
+                0.5905172413793104,
+                0.6350910409281341
+              ],
+              "whenPlayed": {
+                "n": 376,
+                "score": 272
+              },
+              "whenNotPlayed": {
+                "n": 88,
+                "score": 33
+              }
+            },
+            "Rare Candy": {
+              "copies": 2,
+              "drawnBy3": 0.35965194972607156,
+              "played": 0.3567112471801483,
+              "playedByN": 0.08914759909764744,
+              "avgFirstPlayTurn": 8.849568880021469,
+              "avgFirstPlayOwnTurn": 4.727096710627811,
+              "playedByOwn": [
+                0,
+                0.08914759909764744,
+                0.14423541733805995,
+                0.19164921044150823,
+                0.2420037060908798,
+                0.279326458266194
+              ],
+              "whenPlayed": {
+                "n": 170,
+                "score": 122
+              },
+              "whenNotPlayed": {
+                "n": 294,
+                "score": 183
+              }
+            }
+          },
+          "firstKoOwnTurn": 4.443837352364874,
+          "mainAttackOwnTurn": 4.846273664030674,
+          "mainAttackByOwn": [
+            0.04930712213986465,
+            0.2829116983564293,
+            0.4274693844666452
+          ]
+        }
+      },
+      "deltas": [
+        {
+          "field": "Dragapult ex",
+          "delta": -0.05172413793103448,
+          "lo": -0.12523037516834276,
+          "hi": 0.021782099306273804,
+          "se": 0.03750387111054503
+        },
+        {
+          "field": "N's Zoroark ex",
+          "delta": -0.04741379310344827,
+          "lo": -0.10756593691063536,
+          "hi": 0.012738350703738813,
+          "se": 0.030690432991211616
+        }
+      ],
+      "delta": {
+        "est": -0.0507774734128263,
+        "se": 0.030033196610734163,
+        "lo": -0.10964145757478727,
+        "hi": 0.008086510749134676
+      },
+      "verdict": "too close to call",
+      "gamesNeeded": 2010,
+      "mechanism": [
+        {
+          "scope": "overall",
+          "metric": "first KO turn",
+          "diff": 0.34234791852973445,
+          "se": 0.38760433135964056,
+          "significant": false,
+          "text": "first KO turn: no detectable change across the weighted field (+0.34 +/- 0.76)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex first attack",
+          "diff": 0.557459437288364,
+          "se": 0.37063967894688943,
+          "significant": false,
+          "text": "Dragapult ex first attack: no detectable change across the weighted field (+0.56 +/- 0.73)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex first attack (own turn)",
+          "diff": 0.28925010944758744,
+          "se": 0.18408418346616287,
+          "significant": false,
+          "text": "Dragapult ex first attack (own turn): no detectable change across the weighted field (+0.29 +/- 0.36)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.04930712213986465,
+          "se": 0.01140679902652352,
+          "significant": true,
+          "text": "2 Candy for Drakloak+Pad attacked with Dragapult ex by its own turn 2 in 4.9 points more games across the weighted field."
+        },
+        {
+          "scope": "Dragapult ex",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.04741379310344827,
+          "se": 0.013982940336823523,
+          "significant": true,
+          "text": "2 Candy for Drakloak+Pad attacked with Dragapult ex by its own turn 2 in 4.7 points more games vs Dragapult ex."
+        },
+        {
+          "scope": "N's Zoroark ex",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.05603448275862069,
+          "se": 0.015132119375656207,
+          "significant": true,
+          "text": "2 Candy for Drakloak+Pad attacked with Dragapult ex by its own turn 2 in 5.6 points more games vs N's Zoroark ex."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex attack by own turn 3",
+          "diff": -0.05623590074121818,
+          "se": 0.03475808666505924,
+          "significant": false,
+          "text": "Dragapult ex attack by own turn 3: no detectable change across the weighted field (-0.06 +/- 0.07)."
+        },
+        {
+          "scope": "overall",
+          "metric": "game length",
+          "diff": 0.6214751853045439,
+          "se": 0.5750574304892939,
+          "significant": false,
+          "text": "game length: no detectable change across the weighted field (+0.62 +/- 1.13)."
+        },
+        {
+          "scope": "overall",
+          "metric": "KOs per game",
+          "diff": -0.19795359329680973,
+          "se": 0.1733443597772888,
+          "significant": false,
+          "text": "KOs per game: no detectable change across the weighted field (-0.20 +/- 0.34)."
+        },
+        {
+          "scope": "overall",
+          "metric": "prizes per game",
+          "diff": -0.23864002578150173,
+          "se": 0.19160788320511646,
+          "significant": false,
+          "text": "prizes per game: no detectable change across the weighted field (-0.24 +/- 0.38)."
+        },
+        {
+          "scope": "overall",
+          "metric": "deck-out rate",
+          "diff": -0.004834031582339671,
+          "se": 0.006837257501249923,
+          "significant": false,
+          "text": "deck-out rate: no detectable change across the weighted field (-0.00 +/- 0.01)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Drakloak",
+          "diff": -1,
+          "se": 0,
+          "significant": false,
+          "text": "Drakloak (4 -> 3 copies): drawn by turn 3 in 61% -> 49% of games; played at all 93% -> 90%; played by turn 4 66% -> 53%. Observational (not causal): base win rate 74% when played (n=437) vs 11% when not (n=27); variant win rate 70% when played (n=429) vs 11% when not (n=35)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Poké Pad",
+          "diff": -1,
+          "se": 0,
+          "significant": false,
+          "text": "Poké Pad (4 -> 3 copies): drawn by turn 3 in 59% -> 49% of games; played at all 86% -> 78%; played by turn 4 40% -> 30%. Observational (not causal): base win rate 75% when played (n=406) vs 40% when not (n=58); variant win rate 72% when played (n=376) vs 38% when not (n=88)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Rare Candy",
+          "diff": 2,
+          "se": 0,
+          "significant": false,
+          "text": "Rare Candy (0 -> 2 copies): drawn by turn 3 in 0% -> 36% of games; played at all 0% -> 36%; played by turn 4 0% -> 9%. Observational (not causal): base no played/not-played split (card always or never played); variant win rate 72% when played (n=170) vs 62% when not (n=294)."
+        }
+      ]
+    },
+    {
+      "name": "1 Candy for Pad",
+      "change": "-1 Poké Pad +1 Rare Candy",
+      "mainAttacker": "Dragapult ex",
+      "matchups": [
+        {
+          "field": "Dragapult ex",
+          "weight": 0.780373831775701,
+          "n": 232,
+          "score": 0.5258620689655172,
+          "lo": 0.46171201395816874,
+          "hi": 0.5891696251604217,
+          "mech": {
+            "n": 232,
+            "avgTurns": 16.375,
+            "reasons": {
+              "prizes": 0.8275862068965494,
+              "no-pokemon": 0.15086206896551724,
+              "deckout": 0.021551724137931036
+            },
+            "kosPerGame": 3.060344827586207,
+            "prizesPerGame": 3.4439655172413794,
+            "firstKoTurn": 7.977401129943503,
+            "mainAttackTurn": 8.595375722543352,
+            "mainAttackRate": 0.7456896551724138,
+            "deckOutRate": 0.008620689655172414,
+            "cards": {
+              "Drakloak": {
+                "copies": 4,
+                "drawnBy3": 0.6077586206896551,
+                "played": 0.9181034482758621,
+                "playedByN": 0.6077586206896551,
+                "avgFirstPlayTurn": 5.061032863849765,
+                "playedByOwn": [
+                  0,
+                  0.6077586206896551,
+                  0.7241379310344828,
+                  0.8017241379310345,
+                  0.8448275862068966,
+                  0.8879310344827587
+                ],
+                "avgFirstPlayOwnTurn": 2.8215962441314555,
+                "whenPlayed": {
+                  "n": 213,
+                  "score": 121
+                },
+                "whenNotPlayed": {
+                  "n": 19,
+                  "score": 1
+                }
+              },
+              "Poké Pad": {
+                "copies": 3,
+                "drawnBy3": 0.47413793103448276,
+                "played": 0.7586206896551724,
+                "playedByN": 0.2801724137931034,
+                "avgFirstPlayTurn": 7.454545454545454,
+                "playedByOwn": [
+                  0.1724137931034483,
+                  0.2801724137931034,
+                  0.3793103448275862,
+                  0.4956896551724138,
+                  0.5474137931034483,
+                  0.6293103448275862
+                ],
+                "avgFirstPlayOwnTurn": 4.005681818181818,
+                "whenPlayed": {
+                  "n": 176,
+                  "score": 101
+                },
+                "whenNotPlayed": {
+                  "n": 56,
+                  "score": 21
+                }
+              },
+              "Rare Candy": {
+                "copies": 1,
+                "drawnBy3": 0.1853448275862069,
+                "played": 0.15948275862068967,
+                "playedByN": 0.03879310344827586,
+                "avgFirstPlayTurn": 8,
+                "playedByOwn": [
+                  0,
+                  0.03879310344827586,
+                  0.06896551724137931,
+                  0.08620689655172414,
+                  0.12931034482758622,
+                  0.14224137931034483
+                ],
+                "avgFirstPlayOwnTurn": 4.27027027027027,
+                "whenPlayed": {
+                  "n": 37,
+                  "score": 23
+                },
+                "whenNotPlayed": {
+                  "n": 195,
+                  "score": 99
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.288135593220339,
+            "mainAttackOwnTurn": 4.595375722543353,
+            "mainAttackByOwn": [
+              0.021551724137931036,
+              0.3017241379310345,
+              0.46120689655172414
+            ]
+          }
+        },
+        {
+          "field": "N's Zoroark ex",
+          "weight": 0.2196261682242991,
+          "n": 232,
+          "score": 0.8189655172413793,
+          "lo": 0.7643543872898009,
+          "hi": 0.8631858285061484,
+          "mech": {
+            "n": 232,
+            "avgTurns": 19.862068965517242,
+            "reasons": {
+              "prizes": 0.9137931034482731,
+              "no-pokemon": 0.06465517241379312,
+              "deckout": 0.021551724137931036
+            },
+            "kosPerGame": 4.508620689655173,
+            "prizesPerGame": 5.137931034482759,
+            "firstKoTurn": 9.142201834862385,
+            "mainAttackTurn": 10.317972350230415,
+            "mainAttackRate": 0.9353448275862069,
+            "deckOutRate": 0,
+            "cards": {
+              "Drakloak": {
+                "copies": 4,
+                "drawnBy3": 0.5948275862068966,
+                "played": 0.9655172413793104,
+                "playedByN": 0.5689655172413793,
+                "avgFirstPlayTurn": 5.571428571428571,
+                "playedByOwn": [
+                  0,
+                  0.5689655172413793,
+                  0.7456896551724138,
+                  0.8146551724137931,
+                  0.8793103448275862,
+                  0.9051724137931034
+                ],
+                "avgFirstPlayOwnTurn": 3.0401785714285716,
+                "whenPlayed": {
+                  "n": 224,
+                  "score": 189
+                },
+                "whenNotPlayed": {
+                  "n": 8,
+                  "score": 1
+                }
+              },
+              "Poké Pad": {
+                "copies": 3,
+                "drawnBy3": 0.5172413793103449,
+                "played": 0.8318965517241379,
+                "playedByN": 0.3275862068965517,
+                "avgFirstPlayTurn": 8.82901554404145,
+                "playedByOwn": [
+                  0.14655172413793102,
+                  0.3275862068965517,
+                  0.4396551724137931,
+                  0.5,
+                  0.5560344827586207,
+                  0.603448275862069
+                ],
+                "avgFirstPlayOwnTurn": 4.683937823834197,
+                "whenPlayed": {
+                  "n": 193,
+                  "score": 166
+                },
+                "whenNotPlayed": {
+                  "n": 39,
+                  "score": 24
+                }
+              },
+              "Rare Candy": {
+                "copies": 1,
+                "drawnBy3": 0.1853448275862069,
+                "played": 0.15517241379310345,
+                "playedByN": 0.034482758620689655,
+                "avgFirstPlayTurn": 9.583333333333334,
+                "playedByOwn": [
+                  0,
+                  0.034482758620689655,
+                  0.06896551724137931,
+                  0.08620689655172414,
+                  0.09482758620689655,
+                  0.10775862068965517
+                ],
+                "avgFirstPlayOwnTurn": 5.055555555555555,
+                "whenPlayed": {
+                  "n": 36,
+                  "score": 28
+                },
+                "whenNotPlayed": {
+                  "n": 196,
+                  "score": 162
+                }
+              }
+            },
+            "firstKoOwnTurn": 4.825688073394495,
+            "mainAttackOwnTurn": 5.419354838709677,
+            "mainAttackByOwn": [
+              0.021551724137931036,
+              0.31896551724137934,
+              0.47844827586206895
+            ]
+          }
+        }
+      ],
+      "overall": {
+        "est": 0.5902352562036739,
+        "se": 0.026192968735708245,
+        "lo": 0.5388979804285602,
+        "hi": 0.6415725319787876,
+        "mech": {
+          "n": 464,
+          "avgTurns": 17.140851595230423,
+          "reasons": {
+            "prizes": 0.8465194972607131,
+            "no-pokemon": 0.13192877860135355,
+            "deckout": 0.02155172413793104
+          },
+          "kosPerGame": 3.3784241057041577,
+          "prizesPerGame": 3.816004672897197,
+          "firstKoTurn": 8.2332218455098,
+          "mainAttackTurn": 8.97370301927836,
+          "mainAttackRate": 0.787342893973574,
+          "deckOutRate": 0.006727360618756043,
+          "cards": {
+            "Drakloak": {
+              "copies": 4,
+              "drawnBy3": 0.6049186271350306,
+              "played": 0.9285167579761522,
+              "playedByN": 0.5992386400257815,
+              "avgFirstPlayTurn": 5.173129117383429,
+              "avgFirstPlayOwnTurn": 2.869602643117271,
+              "playedByOwn": [
+                0,
+                0.5992386400257815,
+                0.7288712536255237,
+                0.8045641314856591,
+                0.852400902352562,
+                0.8917176925555914
+              ],
+              "whenPlayed": {
+                "n": 437,
+                "score": 310
+              },
+              "whenNotPlayed": {
+                "n": 27,
+                "score": 2
+              }
+            },
+            "Poké Pad": {
+              "copies": 3,
+              "drawnBy3": 0.48360457621656466,
+              "played": 0.7747139864647117,
+              "playedByN": 0.2905857234933935,
+              "avgFirstPlayTurn": 7.75641505364037,
+              "avgFirstPlayOwnTurn": 4.154644585778369,
+              "playedByOwn": [
+                0.16673380599419918,
+                0.2905857234933935,
+                0.3925636480825008,
+                0.49663631969062205,
+                0.5493071221398647,
+                0.6236303577183371
+              ],
+              "whenPlayed": {
+                "n": 369,
+                "score": 267
+              },
+              "whenNotPlayed": {
+                "n": 95,
+                "score": 45
+              }
+            },
+            "Rare Candy": {
+              "copies": 1,
+              "drawnBy3": 0.1853448275862069,
+              "played": 0.15853609410248148,
+              "playedByN": 0.03784643893006768,
+              "avgFirstPlayTurn": 8.347741433021808,
+              "avgFirstPlayOwnTurn": 4.442739468440403,
+              "playedByOwn": [
+                0,
+                0.03784643893006768,
+                0.06896551724137931,
+                0.08620689655172416,
+                0.12173702868192074,
+                0.13466806316467936
+              ],
+              "whenPlayed": {
+                "n": 73,
+                "score": 51
+              },
+              "whenNotPlayed": {
+                "n": 391,
+                "score": 261
+              }
+            }
+          },
+          "firstKoOwnTurn": 4.406196184660458,
+          "mainAttackOwnTurn": 4.776343098523808,
+          "mainAttackByOwn": [
+            0.02155172413793104,
+            0.30551079600386727,
+            0.4649935546245569
+          ]
+        }
+      },
+      "deltas": [
+        {
+          "field": "Dragapult ex",
+          "delta": -0.008620689655172414,
+          "lo": -0.08338552981112236,
+          "hi": 0.06614415050077753,
+          "se": 0.03814602725149541
+        },
+        {
+          "field": "N's Zoroark ex",
+          "delta": -0.0603448275862069,
+          "lo": -0.11970330110044732,
+          "hi": -0.0009863540719664832,
+          "se": 0.03028549173058302
+        }
+      ],
+      "delta": {
+        "est": -0.019980663873670645,
+        "se": 0.030502224656385198,
+        "lo": -0.079763926120098,
+        "hi": 0.039802598372756716
+      },
+      "verdict": "too close to call",
+      "gamesNeeded": 2073,
+      "mechanism": [
+        {
+          "scope": "overall",
+          "metric": "first KO turn",
+          "diff": 0.2587400287755604,
+          "se": 0.4020292026856866,
+          "significant": false,
+          "text": "first KO turn: no detectable change across the weighted field (+0.26 +/- 0.79)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex first attack",
+          "diff": 0.4296750507568896,
+          "se": 0.37306736562380194,
+          "significant": false,
+          "text": "Dragapult ex first attack: no detectable change across the weighted field (+0.43 +/- 0.73)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex first attack (own turn)",
+          "diff": 0.2193195439407216,
+          "se": 0.18616684403548642,
+          "significant": false,
+          "text": "Dragapult ex first attack (own turn): no detectable change across the weighted field (+0.22 +/- 0.36)."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.02155172413793104,
+          "se": 0.007745670202260654,
+          "significant": true,
+          "text": "1 Candy for Pad attacked with Dragapult ex by its own turn 2 in 2.2 points more games across the weighted field."
+        },
+        {
+          "scope": "Dragapult ex",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.021551724137931036,
+          "se": 0.009554411805811867,
+          "significant": true,
+          "text": "1 Candy for Pad attacked with Dragapult ex by its own turn 2 in 2.2 points more games vs Dragapult ex."
+        },
+        {
+          "scope": "N's Zoroark ex",
+          "metric": "Dragapult ex attack by own turn 2",
+          "diff": 0.021551724137931036,
+          "se": 0.009554411805811862,
+          "significant": true,
+          "text": "1 Candy for Pad attacked with Dragapult ex by its own turn 2 in 2.2 points more games vs N's Zoroark ex."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex attack by own turn 3",
+          "diff": -0.03363680309378024,
+          "se": 0.035238411179813856,
+          "significant": false,
+          "text": "Dragapult ex attack by own turn 3: no detectable change across the weighted field (-0.03 +/- 0.07)."
+        },
+        {
+          "scope": "overall",
+          "metric": "game length",
+          "diff": 1.0477360618756049,
+          "se": 0.6314749885142036,
+          "significant": false,
+          "text": "game length: no detectable change across the weighted field (+1.05 +/- 1.24)."
+        },
+        {
+          "scope": "overall",
+          "metric": "KOs per game",
+          "diff": -0.06445375443119572,
+          "se": 0.17476186877030728,
+          "significant": false,
+          "text": "KOs per game: no detectable change across the weighted field (-0.06 +/- 0.34)."
+        },
+        {
+          "scope": "overall",
+          "metric": "prizes per game",
+          "diff": -0.09651949726071533,
+          "se": 0.19212093846748662,
+          "significant": false,
+          "text": "prizes per game: no detectable change across the weighted field (-0.10 +/- 0.38)."
+        },
+        {
+          "scope": "overall",
+          "metric": "deck-out rate",
+          "diff": -0.0033636803093780214,
+          "se": 0.007495324364085998,
+          "significant": false,
+          "text": "deck-out rate: no detectable change across the weighted field (-0.00 +/- 0.01)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Poké Pad",
+          "diff": -1,
+          "se": 0,
+          "significant": false,
+          "text": "Poké Pad (4 -> 3 copies): drawn by turn 3 in 59% -> 48% of games; played at all 86% -> 77%; played by turn 4 40% -> 29%. Observational (not causal): base win rate 75% when played (n=406) vs 40% when not (n=58); variant win rate 72% when played (n=369) vs 47% when not (n=95)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Rare Candy",
+          "diff": 1,
+          "se": 0,
+          "significant": false,
+          "text": "Rare Candy (0 -> 1 copies): drawn by turn 3 in 0% -> 19% of games; played at all 0% -> 16%; played by turn 4 0% -> 4%. Observational (not causal): base no played/not-played split (card always or never played); variant win rate 70% when played (n=73) vs 67% when not (n=391)."
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "date": "2026-10-14",
+    "agent": "search:fast",
+    "seedBase": 50003000,
+    "gamesPerMatchup": 232,
+    "gamesRequested": 2000,
+    "totalGames": 1392,
+    "field": [
+      {
+        "name": "Dragapult ex",
+        "weight": 0.780373831775701
+      },
+      {
+        "name": "N's Zoroark ex",
+        "weight": 0.2196261682242991
+      }
+    ],
+    "changedCards": [
+      "Drakloak",
+      "Poké Pad",
+      "Rare Candy"
+    ],
+    "turnN": 4
+  },
+  "screen": {
+    "agent": "greedy",
+    "gamesPerMatchup": 600,
+    "kept": [
+      "2 Candy for Drakloak+Pad",
+      "1 Candy for Pad"
+    ],
+    "deltas": [
+      {
+        "name": "2 Candy for Drakloak+Pad",
+        "delta": -0.010607476635514018,
+        "lo": -0.039366174306820496,
+        "hi": 0.01815122103579246
+      },
+      {
+        "name": "2 Candy for Drakloak+Hammer",
+        "delta": -0.016542056074766356,
+        "lo": -0.04495501607370498,
+        "hi": 0.011870903924172269
+      },
+      {
+        "name": "1 Candy for Pad",
+        "delta": -0.013738317757009346,
+        "lo": -0.03297361821750569,
+        "hi": 0.005496982703486997
+      }
+    ]
+  }
+}

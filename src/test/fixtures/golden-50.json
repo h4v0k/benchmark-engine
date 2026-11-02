@@ -1,9 +1,9 @@
 [
  {
   "seed": 1,
-  "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 19
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 11
  },
  {
   "seed": 2,
@@ -19,117 +19,117 @@
  },
  {
   "seed": 4,
-  "winner": 0,
-  "reason": "no-pokemon",
-  "turns": 6
+  "winner": 1,
+  "reason": "prizes",
+  "turns": 39
  },
  {
   "seed": 5,
   "winner": 0,
   "reason": "prizes",
-  "turns": 37
+  "turns": 27
  },
  {
   "seed": 6,
   "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 6
+  "reason": "prizes",
+  "turns": 12
  },
  {
   "seed": 7,
-  "winner": 1,
+  "winner": 0,
   "reason": "prizes",
-  "turns": 11
+  "turns": 14
  },
  {
   "seed": 8,
-  "winner": 0,
+  "winner": 1,
   "reason": "prizes",
-  "turns": 26
+  "turns": 19
  },
  {
   "seed": 9,
   "winner": 0,
   "reason": "prizes",
-  "turns": 20
+  "turns": 32
  },
  {
   "seed": 10,
   "winner": 1,
   "reason": "prizes",
-  "turns": 12
+  "turns": 10
  },
  {
   "seed": 11,
   "winner": 0,
-  "reason": "prizes",
-  "turns": 19
+  "reason": "deckout",
+  "turns": 38
  },
  {
   "seed": 12,
-  "winner": 0,
-  "reason": "prizes",
-  "turns": 44
- },
- {
-  "seed": 13,
-  "winner": 0,
-  "reason": "prizes",
-  "turns": 32
- },
- {
-  "seed": 14,
   "winner": 1,
   "reason": "prizes",
   "turns": 25
  },
  {
+  "seed": 13,
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 22
+ },
+ {
+  "seed": 14,
+  "winner": 1,
+  "reason": "prizes",
+  "turns": 17
+ },
+ {
   "seed": 15,
   "winner": 0,
-  "reason": "no-pokemon",
-  "turns": 6
+  "reason": "prizes",
+  "turns": 20
  },
  {
   "seed": 16,
   "winner": 1,
   "reason": "prizes",
-  "turns": 20
+  "turns": 30
  },
  {
   "seed": 17,
   "winner": 0,
   "reason": "prizes",
-  "turns": 19
+  "turns": 13
  },
  {
   "seed": 18,
   "winner": 1,
   "reason": "prizes",
-  "turns": 13
+  "turns": 19
  },
  {
   "seed": 19,
   "winner": 0,
   "reason": "prizes",
-  "turns": 24
+  "turns": 20
  },
  {
   "seed": 20,
-  "winner": 1,
+  "winner": 0,
   "reason": "prizes",
-  "turns": 30
+  "turns": 15
  },
  {
   "seed": 21,
   "winner": 0,
   "reason": "prizes",
-  "turns": 12
+  "turns": 18
  },
  {
   "seed": 22,
   "winner": 1,
-  "reason": "prizes",
-  "turns": 17
+  "reason": "no-pokemon",
+  "turns": 13
  },
  {
   "seed": 23,
@@ -141,13 +141,13 @@
   "seed": 24,
   "winner": 1,
   "reason": "prizes",
-  "turns": 17
+  "turns": 35
  },
  {
   "seed": 25,
-  "winner": 1,
+  "winner": 0,
   "reason": "prizes",
-  "turns": 21
+  "turns": 30
  },
  {
   "seed": 26,
@@ -159,7 +159,7 @@
   "seed": 27,
   "winner": 0,
   "reason": "prizes",
-  "turns": 28
+  "turns": 14
  },
  {
   "seed": 28,
@@ -170,133 +170,133 @@
  {
   "seed": 29,
   "winner": 0,
-  "reason": "deckout",
-  "turns": 49
+  "reason": "prizes",
+  "turns": 14
  },
  {
   "seed": 30,
   "winner": 1,
   "reason": "prizes",
-  "turns": 22
+  "turns": 12
  },
  {
   "seed": 31,
   "winner": 0,
   "reason": "prizes",
-  "turns": 47
+  "turns": 23
  },
  {
   "seed": 32,
-  "winner": 0,
+  "winner": 1,
   "reason": "prizes",
-  "turns": 33
+  "turns": 26
  },
  {
   "seed": 33,
   "winner": 0,
   "reason": "prizes",
-  "turns": 35
+  "turns": 31
  },
  {
   "seed": 34,
   "winner": 1,
   "reason": "prizes",
-  "turns": 19
+  "turns": 13
  },
  {
   "seed": 35,
-  "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 3
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 17
  },
  {
   "seed": 36,
   "winner": 1,
   "reason": "no-pokemon",
-  "turns": 7
+  "turns": 3
  },
  {
   "seed": 37,
   "winner": 0,
   "reason": "prizes",
-  "turns": 33
+  "turns": 13
  },
  {
   "seed": 38,
-  "winner": 0,
-  "reason": "prizes",
-  "turns": 21
- },
- {
-  "seed": 39,
-  "winner": 1,
-  "reason": "deckout",
-  "turns": 61
- },
- {
-  "seed": 40,
   "winner": 1,
   "reason": "prizes",
   "turns": 20
  },
  {
+  "seed": 39,
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 23
+ },
+ {
+  "seed": 40,
+  "winner": 1,
+  "reason": "prizes",
+  "turns": 12
+ },
+ {
   "seed": 41,
   "winner": 0,
-  "reason": "deckout",
-  "turns": 46
+  "reason": "prizes",
+  "turns": 29
  },
  {
   "seed": 42,
-  "winner": 1,
-  "reason": "prizes",
-  "turns": 13
+  "winner": 0,
+  "reason": "deckout",
+  "turns": 55
  },
  {
   "seed": 43,
-  "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 2
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 10
  },
  {
   "seed": 44,
   "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 7
+  "reason": "prizes",
+  "turns": 15
  },
  {
   "seed": 45,
-  "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 8
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 22
  },
  {
   "seed": 46,
   "winner": 1,
   "reason": "prizes",
-  "turns": 29
+  "turns": 11
  },
  {
   "seed": 47,
   "winner": 0,
   "reason": "prizes",
-  "turns": 28
+  "turns": 14
  },
  {
   "seed": 48,
   "winner": 1,
   "reason": "prizes",
-  "turns": 41
+  "turns": 15
  },
  {
   "seed": 49,
-  "winner": 1,
-  "reason": "no-pokemon",
-  "turns": 9
+  "winner": 0,
+  "reason": "prizes",
+  "turns": 12
  },
  {
   "seed": 50,
   "winner": 1,
   "reason": "prizes",
-  "turns": 31
+  "turns": 23
  }
 ]

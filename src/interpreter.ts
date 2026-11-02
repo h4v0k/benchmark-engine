@@ -2,7 +2,7 @@
 // `ask` throws NeedChoice; the caller (game.ts) turns that into state.pendingChoice and later REPLAYS the
 // originating action with the recorded answers (deterministic because the rng lives in the state).
 import type { Amount, CardFilter, CardSel, Condition, Duration, Effect, Entry, PlayerRef, Selector, Status, Trigger, Zone } from "./dsl/types.js";
-import { defOf, isBasicPokemon, matchesFilter, type AttackDef } from "./cards/model.js";
+import { defOf, hasSub, isBasicPokemon, matchesFilter, registeredDefs, type AttackDef, type CardDef } from "./cards/model.js";
 import { flip, shuffle } from "./rng.js";
 import {
   type ChoiceReq, type GameState, type Marker, type PlayerId, type PlayerState, type PokemonInPlay,
@@ -564,6 +564,52 @@ function run_putOnBench(ctx: Ctx, e: Extract<Effect, { e: "putOnBench" }>): void
     return;
 }
 
+/** Can `card` be put onto `t` as an evolution right now (turn/first-turn rules included)? `skipStage`: Basic -> Stage 2 through a Stage 1 that evolves from it (checked against the registered card defs). */
+export function canEvolveOnto(s: GameState, t: PokemonInPlay, card: string, skipStage: boolean): boolean {
+  if (s.rules.noEvolveOnFirstTurn && s.turn <= 2) return false;
+  if (t.turnPlayed >= s.turn || t.evolvedThisTurn) return false;
+  const d = defOf(card), top = topDef(t);
+  if (!d.evolvesFrom) return false;
+  if (!skipStage) return d.evolvesFrom === top.name;
+  if (!hasSub(d, "stage2") || !isBasicPokemon(top) || t.below.length > 0) return false;
+  for (const m of registeredDefs()) if (m.name === d.evolvesFrom && hasSub(m, "stage1") && m.evolvesFrom === top.name) return true;
+  return false;
+}
+/** (Pokémon, hand card) pairs an `evolve` effect could resolve with right now. */
+export function evolvePairs(ctx: Ctx, e: Extract<Effect, { e: "evolve" }>): Array<{ p: PokemonInPlay; card: string }> {
+  const s = S(ctx);
+  const out: Array<{ p: PokemonInPlay; card: string }> = [];
+  const cards = e.sel.player === "self" ? zoneArr(s.players[ctx.player], e.sel.zone) : [];
+  if (e.from.s !== "pick") return out;
+  for (const p of pickCandidates(ctx, e.from)) for (const c of cards) if (cardMatches(c, e.sel.filter) && canEvolveOnto(s, p, c, !!e.skipStage)) out.push({ p, card: c });
+  return out;
+}
+/** Put `card` (already out of the hand) onto `t`: damage, Energy, Tools stay; Special Conditions and effects end. Shared by the evolve action and the `evolve` effect. */
+export function applyEvolution(run: Run, pl: PlayerId, t: PokemonInPlay, card: string): void {
+  const s = run.s;
+  const fromId = t.iid, fromName = topDef(t).name;
+  t.below.push(t.iid);
+  t.iid = card;
+  t.evolvedThisTurn = true;
+  t.status = { asleep: false, paralyzed: false, confused: false, poisoned: false, burned: false };
+  t.markers = []; t.usedAbilities = [];
+  emit(s, { type: "evolve", player: pl, from: fromId, to: card, fromName, toName: defOf(card).name });
+  fireOnEvolve(run, pl, t);
+}
+function run_evolve(ctx: Ctx, e: Extract<Effect, { e: "evolve" }>): void {
+  const s = S(ctx);
+  const pairs = evolvePairs(ctx, e);
+  if (!pairs.length || e.from.s !== "pick") { ctx.didPrev = false; return; }
+  const [t] = selectPokemon(ctx, e.from, undefined, undefined, (p) => pairs.some((x) => x.p === p));
+  if (!t) { ctx.didPrev = false; return; }
+  const opts = pairs.filter((x) => x.p === t).map((x) => x.card);
+  const [card] = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: 1, max: 1, prompt: "choose a card to evolve with" });
+  if (!card) { ctx.didPrev = false; return; }
+  removeItem(s.players[ctx.player].hand, card);
+  applyEvolution(ctx.run, ctx.player, t, card);
+  ctx.didPrev = true;
+}
+
 function run_returnToHand(ctx: Ctx, e: Extract<Effect, { e: "returnToHand" }>): void {
   const s = S(ctx);
     for (const t of selectPokemon(ctx, e.who)) {
@@ -737,7 +783,8 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     }
     case "copyAttack": return run_copyAttack(ctx, e);
     case "endTurn": ctx.endTurn = true; return;
-    case "evolve": case "useAgain": return notImplemented(e);
+    case "evolve": return run_evolve(ctx, e);
+    case "useAgain": return notImplemented(e);
   }
 }
 
