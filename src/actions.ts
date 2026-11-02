@@ -1,9 +1,9 @@
 import type { Condition, Effect } from "./dsl/types.js";
 import { defIdOf, defOf, hasSub, isBasicPokemon, isEnergy, isPokemon, matchesFilter, type AbilityDef, type CardDef } from "./cards/model.js";
 import { countRange, evalCond, newCtx, pickCandidates, pokemonFacts, type Run } from "./interpreter.js";
-import { abilityLocked } from "./statics.js";
+import { abilityLocked, withStaticSnapshot } from "./statics.js";
 import { canPay, isFirstTurnOfGame, providedEnergy, retreatCostOf } from "./rules.js";
-import { cloneState, hasMarker, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "./state.js";
+import { hasMarker, inPlay, logText, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "./state.js";
 
 export type Action =
   | { type: "playBasicToBench"; card: string }
@@ -121,20 +121,29 @@ export function canRetreatNow(s: GameState, pl: PlayerId): boolean {
   return true;
 }
 
+/** The most recent `legalActions` result. `wasIssued` lets a driver that never mutates states (sim.ts) skip re-validating an action it took from that list. */
+let issued: { state: GameState; actions: Action[] } | null = null;
+/** True iff `action` is, by identity, one of the actions the latest `legalActions(state, ...)` call returned for this very state object. */
+export const wasIssued = (state: GameState, action: Action): boolean => issued !== null && issued.state === state && issued.actions.includes(action);
+
 /** All legal actions for `player` at the current decision point. Identical cards are deduped (first copy). */
 export function legalActions(s: GameState, player: PlayerId): Action[] {
   const out = enumerate(s, player, true);
+  issued = { state: s, actions: out };
   // The decider of a non-terminal state always has at least one legal action (endTurn / a valid pick); an empty list is an engine bug.
   if (!out.length && s.phase !== "over" && decider(s) === player) {
     const pc = s.pendingChoice;
     throw new Error(`engine bug: no legal actions for P${player} in non-terminal state (phase ${s.phase}, turn ${s.turn}, active P${s.activePlayer}, ` +
-      `pending ${pc ? `${pc.kind} "${pc.prompt}" min ${pc.min} max ${pc.max} options [${pc.options.slice(0, 8).join(", ")}]` : "none"}); last log: ${s.log.slice(-5).join(" | ")}`);
+      `pending ${pc ? `${pc.kind} "${pc.prompt}" min ${pc.min} max ${pc.max} options [${pc.options.slice(0, 8).join(", ")}]` : "none"}); last log: ${logText(s).slice(-5).join(" | ")}`);
   }
   return out;
 }
 
 export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Action[] {
   if (s.phase === "over" || decider(s) !== player) return [];
+  return withStaticSnapshot(s, () => enumerateInner(s, player, dedupe)); // enumeration never changes the board
+}
+function enumerateInner(s: GameState, player: PlayerId, dedupe: boolean): Action[] {
   if (s.pendingChoice) return chooseActions(s.pendingChoice, dedupe);
   const ps = s.players[player];
   const out: Action[] = [];
@@ -156,7 +165,8 @@ export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Acti
 
   let scratch: GameState | undefined;
   const holds = (cond: Condition, self?: string): boolean => {
-    scratch ??= cloneState(s);
+    // conditions only read the board; coin flips (rng, events) are the only writes, so a shallow copy with its own rng/event list is a safe scratch
+    scratch ??= { ...s, rng: { s: s.rng.s }, events: [] };
     const run: Run = { s: scratch, answers: [], idx: 0 };
     return evalCond(newCtx(run, player, "other", { self }), cond);
   };
@@ -238,6 +248,19 @@ export function enumerate(s: GameState, player: PlayerId, dedupe: boolean): Acti
   return out;
 }
 
+/** Same action ignoring pre-supplied `choices` (allocation-free equivalent of comparing `actionKey`s; undefined fields count as absent). */
+export function sameAction(a: Action, b: Action): boolean {
+  const ao = a as unknown as Record<string, unknown>, bo = b as unknown as Record<string, unknown>;
+  const eq = (x: unknown, y: unknown): boolean => {
+    if (x === y) return true;
+    if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length) return false;
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  };
+  for (const k in ao) if (k !== "choices" && !eq(ao[k], bo[k])) return false;
+  for (const k in bo) if (k !== "choices" && ao[k] === undefined && bo[k] !== undefined) return false;
+  return true;
+}
 /** Stable key for comparing actions (ignores pre-supplied `choices`). */
 export function actionKey(a: Action): string {
   const o: Record<string, unknown> = { ...a };

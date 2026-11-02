@@ -1,0 +1,482 @@
+{
+  "name": "dragapult-9th-energy",
+  "stage": "confirm",
+  "arms": [
+    {
+      "name": "Dragapult ex (Recife 3rd place list)",
+      "change": null,
+      "mainAttacker": "Dragapult ex",
+      "matchups": [
+        {
+          "field": "Dragapult ex",
+          "weight": 0.780373831775701,
+          "n": 363,
+          "score": 0.4931129476584022,
+          "lo": 0.442024173244264,
+          "hi": 0.5443459605589114,
+          "mech": {
+            "n": 363,
+            "avgTurns": 23.81267217630854,
+            "reasons": {
+              "prizes": 0.8429752066115762,
+              "no-pokemon": 0.11294765840220386,
+              "deckout": 0.0440771349862259
+            },
+            "kosPerGame": 3.1046831955922864,
+            "prizesPerGame": 3.418732782369146,
+            "firstKoTurn": 11.603571428571428,
+            "mainAttackTurn": 15.428571428571429,
+            "mainAttackRate": 0.6556473829201102,
+            "deckOutRate": 0.024793388429752067,
+            "cards": {
+              "Night Stretcher": {
+                "copies": 3,
+                "drawnBy3": 0.5151515151515151,
+                "played": 0.8209366391184573,
+                "playedByN": 0.1652892561983471,
+                "avgFirstPlayTurn": 11.681208053691275,
+                "whenPlayed": {
+                  "n": 298,
+                  "score": 155
+                },
+                "whenNotPlayed": {
+                  "n": 65,
+                  "score": 24
+                }
+              },
+              "Psychic Energy": {
+                "copies": 3,
+                "drawnBy3": 0.48760330578512395,
+                "played": 0.8953168044077136,
+                "playedByN": 0.4380165289256198,
+                "avgFirstPlayTurn": 6.827692307692308,
+                "whenPlayed": {
+                  "n": 325,
+                  "score": 172
+                },
+                "whenNotPlayed": {
+                  "n": 38,
+                  "score": 7
+                }
+              }
+            }
+          }
+        },
+        {
+          "field": "N's Zoroark ex",
+          "weight": 0.2196261682242991,
+          "n": 363,
+          "score": 0.628099173553719,
+          "lo": 0.5772815653737431,
+          "hi": 0.6762339458871947,
+          "mech": {
+            "n": 363,
+            "avgTurns": 32.32506887052342,
+            "reasons": {
+              "deckout": 0.19008264462809918,
+              "prizes": 0.763085399449041,
+              "no-pokemon": 0.046831955922865015
+            },
+            "kosPerGame": 3.203856749311295,
+            "prizesPerGame": 3.8236914600550964,
+            "firstKoTurn": 14.23003194888179,
+            "mainAttackTurn": 18.363970588235293,
+            "mainAttackRate": 0.7493112947658402,
+            "deckOutRate": 0.030303030303030304,
+            "cards": {
+              "Night Stretcher": {
+                "copies": 3,
+                "drawnBy3": 0.45454545454545453,
+                "played": 0.8705234159779615,
+                "playedByN": 0.15702479338842976,
+                "avgFirstPlayTurn": 15.218354430379748,
+                "whenPlayed": {
+                  "n": 316,
+                  "score": 202
+                },
+                "whenNotPlayed": {
+                  "n": 47,
+                  "score": 26
+                }
+              },
+              "Psychic Energy": {
+                "copies": 3,
+                "drawnBy3": 0.4820936639118457,
+                "played": 0.9366391184573003,
+                "playedByN": 0.4325068870523416,
+                "avgFirstPlayTurn": 8.967647058823529,
+                "whenPlayed": {
+                  "n": 340,
+                  "score": 221
+                },
+                "whenNotPlayed": {
+                  "n": 23,
+                  "score": 7
+                }
+              }
+            }
+          }
+        }
+      ],
+      "overall": {
+        "est": 0.5227594552148503,
+        "se": 0.02122307892648271,
+        "lo": 0.48116298454978557,
+        "hi": 0.5643559258799151,
+        "mech": {
+          "n": 726,
+          "avgTurns": 25.682217244664145,
+          "reasons": {
+            "prizes": 0.8254293143842905,
+            "no-pokemon": 0.09842692000720887,
+            "deckout": 0.07614376560850647
+          },
+          "kosPerGame": 3.126464303184779,
+          "prizesPerGame": 3.5076723050384904,
+          "firstKoTurn": 12.180410888639592,
+          "mainAttackTurn": 16.073261898217233,
+          "mainAttackRate": 0.6762184289796864,
+          "deckOutRate": 0.026003449962668318,
+          "cards": {
+            "Night Stretcher": {
+              "copies": 3,
+              "drawnBy3": 0.5018408382894364,
+              "played": 0.8318271929147035,
+              "playedByN": 0.16347416389897274,
+              "avgFirstPlayTurn": 12.458057958851828,
+              "whenPlayed": {
+                "n": 614,
+                "score": 357
+              },
+              "whenNotPlayed": {
+                "n": 112,
+                "score": 50
+              }
+            },
+            "Psychic Energy": {
+              "copies": 3,
+              "drawnBy3": 0.48639324425220776,
+              "played": 0.9043922659045854,
+              "playedByN": 0.43680646739270357,
+              "avgFirstPlayTurn": 7.297682369856641,
+              "whenPlayed": {
+                "n": 665,
+                "score": 393
+              },
+              "whenNotPlayed": {
+                "n": 61,
+                "score": 14
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "9 Energy (4 Psychic)",
+      "change": "-1 Night Stretcher +1 Psychic Energy",
+      "mainAttacker": "Dragapult ex",
+      "matchups": [
+        {
+          "field": "Dragapult ex",
+          "weight": 0.780373831775701,
+          "n": 363,
+          "score": 0.5068870523415978,
+          "lo": 0.4556540394410886,
+          "hi": 0.557975826755736,
+          "mech": {
+            "n": 363,
+            "avgTurns": 23.391184573002754,
+            "reasons": {
+              "prizes": 0.8264462809917413,
+              "no-pokemon": 0.1349862258953168,
+              "deckout": 0.03856749311294766
+            },
+            "kosPerGame": 3.1928374655647382,
+            "prizesPerGame": 3.4517906336088156,
+            "firstKoTurn": 10.378947368421052,
+            "mainAttackTurn": 14.629166666666666,
+            "mainAttackRate": 0.6611570247933884,
+            "deckOutRate": 0.005509641873278237,
+            "cards": {
+              "Night Stretcher": {
+                "copies": 2,
+                "drawnBy3": 0.36639118457300274,
+                "played": 0.6859504132231405,
+                "playedByN": 0.10192837465564739,
+                "avgFirstPlayTurn": 13.477911646586346,
+                "whenPlayed": {
+                  "n": 249,
+                  "score": 136
+                },
+                "whenNotPlayed": {
+                  "n": 114,
+                  "score": 48
+                }
+              },
+              "Psychic Energy": {
+                "copies": 4,
+                "drawnBy3": 0.581267217630854,
+                "played": 0.9366391184573003,
+                "playedByN": 0.5234159779614325,
+                "avgFirstPlayTurn": 6.011764705882353,
+                "whenPlayed": {
+                  "n": 340,
+                  "score": 181
+                },
+                "whenNotPlayed": {
+                  "n": 23,
+                  "score": 3
+                }
+              }
+            }
+          }
+        },
+        {
+          "field": "N's Zoroark ex",
+          "weight": 0.2196261682242991,
+          "n": 363,
+          "score": 0.6115702479338843,
+          "lo": 0.5605126140862079,
+          "hi": 0.6602912183023507,
+          "mech": {
+            "n": 363,
+            "avgTurns": 29.710743801652892,
+            "reasons": {
+              "prizes": 0.8292011019283805,
+              "deckout": 0.12396694214876033,
+              "no-pokemon": 0.046831955922865015
+            },
+            "kosPerGame": 3.2203856749311295,
+            "prizesPerGame": 3.7823691460055096,
+            "firstKoTurn": 13.421052631578947,
+            "mainAttackTurn": 16.91254752851711,
+            "mainAttackRate": 0.7245179063360881,
+            "deckOutRate": 0.01652892561983471,
+            "cards": {
+              "Night Stretcher": {
+                "copies": 2,
+                "drawnBy3": 0.349862258953168,
+                "played": 0.790633608815427,
+                "playedByN": 0.12121212121212122,
+                "avgFirstPlayTurn": 15.97212543554007,
+                "whenPlayed": {
+                  "n": 287,
+                  "score": 186
+                },
+                "whenNotPlayed": {
+                  "n": 76,
+                  "score": 36
+                }
+              },
+              "Psychic Energy": {
+                "copies": 4,
+                "drawnBy3": 0.5647382920110193,
+                "played": 0.9724517906336089,
+                "playedByN": 0.5068870523415978,
+                "avgFirstPlayTurn": 7.246458923512748,
+                "whenPlayed": {
+                  "n": 353,
+                  "score": 221
+                },
+                "whenNotPlayed": {
+                  "n": 10,
+                  "score": 1
+                }
+              }
+            }
+          }
+        }
+      ],
+      "overall": {
+        "est": 0.5298782214670066,
+        "se": 0.021235208274252432,
+        "lo": 0.48825797771696966,
+        "hi": 0.5714984652170435,
+        "mech": {
+          "n": 726,
+          "avgTurns": 24.77912515125769,
+          "reasons": {
+            "prizes": 0.8270513117581996,
+            "no-pokemon": 0.11562524136865683,
+            "deckout": 0.05732344687314951
+          },
+          "kosPerGame": 3.1988877732293197,
+          "prizesPerGame": 3.5243943255837906,
+          "firstKoTurn": 11.047073290703395,
+          "mainAttackTurn": 15.130656855951578,
+          "mainAttackRate": 0.6750727324219253,
+          "deckOutRate": 0.007929764939110734,
+          "cards": {
+            "Night Stretcher": {
+              "copies": 2,
+              "drawnBy3": 0.36276099997425404,
+              "played": 0.7089415823485492,
+              "playedByN": 0.10616359002085426,
+              "avgFirstPlayTurn": 14.025706263786464,
+              "whenPlayed": {
+                "n": 536,
+                "score": 322
+              },
+              "whenNotPlayed": {
+                "n": 190,
+                "score": 84
+              }
+            },
+            "Psychic Energy": {
+              "copies": 4,
+              "drawnBy3": 0.5776370330321052,
+              "played": 0.944504518421256,
+              "playedByN": 0.5197857933626837,
+              "avgFirstPlayTurn": 6.2829358658292165,
+              "whenPlayed": {
+                "n": 693,
+                "score": 402
+              },
+              "whenNotPlayed": {
+                "n": 33,
+                "score": 4
+              }
+            }
+          }
+        }
+      },
+      "deltas": [
+        {
+          "field": "Dragapult ex",
+          "delta": 0.013774104683195593,
+          "lo": -0.05308929347089271,
+          "hi": 0.0806375028372839,
+          "se": 0.03411460524483526
+        },
+        {
+          "field": "N's Zoroark ex",
+          "delta": -0.01652892561983471,
+          "lo": -0.08138820822823888,
+          "hi": 0.04833035698856945,
+          "se": 0.03309207853226088
+        }
+      ],
+      "delta": {
+        "est": 0.007118766252156227,
+        "se": 0.027596390862530726,
+        "lo": -0.04696916636833295,
+        "hi": 0.0612066988726454
+      },
+      "verdict": "too close to call",
+      "gamesNeeded": 2655,
+      "mechanism": [
+        {
+          "scope": "overall",
+          "metric": "first KO turn",
+          "diff": -1.133337597936198,
+          "se": 0.5777862140086266,
+          "significant": true,
+          "text": "9 Energy (4 Psychic) took its first KO 1.1 turns earlier across the weighted field."
+        },
+        {
+          "scope": "overall",
+          "metric": "Dragapult ex first attack",
+          "diff": -0.9426050422656542,
+          "se": 0.6568288337860497,
+          "significant": false,
+          "text": "Dragapult ex first attack: no detectable change across the weighted field (-0.94 +/- 1.29)."
+        },
+        {
+          "scope": "overall",
+          "metric": "game length",
+          "diff": -0.9030920934064519,
+          "se": 0.9176529513211694,
+          "significant": false,
+          "text": "game length: no detectable change across the weighted field (-0.90 +/- 1.80)."
+        },
+        {
+          "scope": "overall",
+          "metric": "KOs per game",
+          "diff": 0.07242347004454056,
+          "se": 0.13855505151202682,
+          "significant": false,
+          "text": "KOs per game: no detectable change across the weighted field (+0.07 +/- 0.27)."
+        },
+        {
+          "scope": "overall",
+          "metric": "prizes per game",
+          "diff": 0.01672202054530031,
+          "se": 0.15114662387354502,
+          "significant": false,
+          "text": "prizes per game: no detectable change across the weighted field (+0.02 +/- 0.30)."
+        },
+        {
+          "scope": "overall",
+          "metric": "deck-out rate",
+          "diff": -0.018073685023557582,
+          "se": 0.007481598484402319,
+          "significant": true,
+          "text": "9 Energy (4 Psychic) decked out 1.8 points less often across the weighted field."
+        },
+        {
+          "scope": "Dragapult ex",
+          "metric": "deck-out rate",
+          "diff": -0.01928374655647383,
+          "se": 0.009051412703698782,
+          "significant": true,
+          "text": "9 Energy (4 Psychic) decked out 1.9 points less often vs Dragapult ex."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Night Stretcher",
+          "diff": -1,
+          "se": 0,
+          "significant": false,
+          "text": "Night Stretcher (3 -> 2 copies): drawn by turn 3 in 50% -> 36% of games; played at all 83% -> 71%; played by turn 4 16% -> 11%. Observational (not causal): base win rate 58% when played (n=614) vs 45% when not (n=112); variant win rate 60% when played (n=536) vs 44% when not (n=190)."
+        },
+        {
+          "scope": "overall",
+          "metric": "card:Psychic Energy",
+          "diff": 1,
+          "se": 0,
+          "significant": false,
+          "text": "Psychic Energy (3 -> 4 copies): drawn by turn 3 in 49% -> 58% of games; played at all 90% -> 94%; played by turn 4 44% -> 52%. Observational (not causal): base win rate 59% when played (n=665) vs 23% when not (n=61); variant win rate 58% when played (n=693) vs 12% when not (n=33)."
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "date": "2026-10-13",
+    "agent": "search:fast",
+    "seedBase": 50001000,
+    "gamesPerMatchup": 363,
+    "gamesRequested": 2000,
+    "totalGames": 1452,
+    "field": [
+      {
+        "name": "Dragapult ex",
+        "weight": 0.780373831775701
+      },
+      {
+        "name": "N's Zoroark ex",
+        "weight": 0.2196261682242991
+      }
+    ],
+    "changedCards": [
+      "Night Stretcher",
+      "Psychic Energy"
+    ],
+    "turnN": 4
+  },
+  "screen": {
+    "agent": "greedy",
+    "gamesPerMatchup": 400,
+    "kept": [
+      "9 Energy (4 Psychic)"
+    ],
+    "deltas": [
+      {
+        "name": "9 Energy (4 Psychic)",
+        "delta": 0.008656542056074766,
+        "lo": -0.021220147796238206,
+        "hi": 0.03853323190838774
+      }
+    ]
+  }
+}

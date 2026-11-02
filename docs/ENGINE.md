@@ -45,8 +45,7 @@ rulebook (pokemon.com) before relying on it. It is a flag precisely so a rules c
 `GameState` is plain JSON (no classes, no functions). Card instances are strings `"<defId>#<n>"`; `defOf(iid)` resolves the
 immutable `CardDef` via a registry filled by `createGame`/`registerCards` (defs are data, so this does not break purity).
 `applyAction(state, action)` validates the action against the legal set, deep-clones the state, mutates the clone and returns
-it — the input is never touched. *Perf (future work)*: whole-state deep clone per action is simple but O(state); structural
-sharing or an undo log would help for large-scale search. A random game of ~35 turns takes ~10 ms today.
+it — the input is never touched. See *Performance* below for how the clone is made cheap.
 
 ### The choice model (resumable interpreter)
 Effects often need decisions (which Pokémon to gust, which card to search). The interpreter never calls back out. Instead:
@@ -84,7 +83,8 @@ Tools and Stadiums contribute through `static` entries (`modify hp|retreat|damag
 - **copyAttack** (`{e:"copyAttack", from, filter?}`): `from` selects the source Pokémon (a `pick` asks the player), then the player
   picks one of its attacks (`option` choice, auto if only one). The copied attack's printed damage replaces the pool and its effect runs
   in the *copier's* context (copier's type for weakness, copier's bonuses), without checking/paying the copied cost. Attacks that
-  themselves contain `copyAttack` are not offered, and `ctx.copying` makes a nested copy a no-op (recursion guard).
+  themselves contain `copyAttack` are not offered, and a Pokémon whose attacks are all like that (another Zoroark ex with only Night Joker)
+  is not offered as a source either (`selectPokemon`'s `accept` filter); `ctx.copying` makes a nested copy a no-op (recursion guard).
 - **Triggers** (all run through the normal choice/replay model; helpers `fireOn*` in interpreter.ts): `onPlayToBench{fromHand:true}`
   fires on a Basic played from hand (silenced by Ability locks); `fromHand:false` entries fire for effect placements (`putOnBench`,
   `search`/`move` to bench). `onPutOnBench{whose,filter}` fires on Pokémon, attached Tool and Stadium rules for any bench placement
@@ -93,7 +93,8 @@ Tools and Stadiums contribute through `static` entries (`modify hp|retreat|damag
   before removal (a KO counts as "by attack" if the Pokémon was lethally damaged right after an attack and the attacker is the
   opponent); supplies `attacker`. `onEvolve` fires after evolving from hand. `endOfTurn{whose}` fires when the active player's turn ends
   (before markers expire and before Checkup); `whose` is relative to the rule owner. Tools' and Stadiums' rules are collected too.
-- **Static effects** (`src/statics.ts`): never cached. `staticStat` (numeric `modify` and `retreatCost` deltas, resolved over the
+- **Static effects** (`src/statics.ts`): board state is never cached (only the per-card list of static entries, which is immutable data;
+  see *Performance* for the read-only scope cache). `staticStat` (numeric `modify` and `retreatCost` deltas, resolved over the
   entry's selector), `staticPreventsDamage` (`prevent from damage|both`, applies to damage done *by attacks* only, so counters,
   poison, burn and confusion are unaffected) and `abilityLocked` (`lock ability{filter}` plus the temporary global `noAbility`
   marker) re-scan Pokémon (with their `while` condition), attached Tools and the Stadium on every call. A Stadium's `self` /
@@ -120,5 +121,70 @@ Tools and Stadiums contribute through `static` entries (`modify hp|retreat|damag
 ### Other design decisions
 - Damage is stored in HP points (multiples of 10 = counters). `turn` is a global counter (turn 1 = first player's first turn).
 - Setup is a sequential state machine (`mulliganAck → mulliganDraw → setupActive → setupBench → main`); placement is not hidden.
-- `observe(state, viewer)` redacts opponent hand/decks/prizes to counts and hides option lists of the opponent's pending choices.
+- `observe(state, viewer)` redacts opponent hand/decks/prizes to counts and hides option lists of the opponent's pending choices. Its `events` copy
+  hides the opponent's decklist (`gameStart`), drawn card ids (`draw`) and unrevealed searches (`search`).
 - `randomAgent(state, rng, {attackBias})` takes a legal attack with probability `attackBias` (default 0.7), else uniform.
+
+## Event stream (`src/events.ts`)
+
+`GameState.events: GameEvent[]` is the append-only, typed record of a game; it replaced the old prose `log: string[]`. Every event is a
+member of the discriminated union `GameEvent` (tag `type`) and carries `turn` (the global turn counter; 0 during setup). Cards are
+identified by stable instance ids (`"<defId>#<n>"`, unique within a game) plus printed names, so analytics can follow one card through a game
+and group by name. The stream is plain JSON, deterministic per seed, and identical between replays of a choice (replayed actions re-run
+from the `base` snapshot, so partially-resolved states never leak events into later ones).
+
+| type | fields (besides `turn`) | emitted when |
+|---|---|---|
+| `gameStart` | `seed, decks, firstPlayer` | game created (`decks`: sorted card def ids per player) |
+| `mulligan` | `player` | each mulligan during setup |
+| `setupComplete` | | Prizes set, turn 1 about to start |
+| `turnStart` | `player` | a turn begins (before its draw) |
+| `draw` | `player, count, cardIds, reason` | `reason`: `setup`, `turn`, `effect`, `mulligan` (extra cards) |
+| `coin` | `heads` | every coin flip |
+| `play` | `player, cardId, cardName, kind, targetId?` | `kind`: `basic` (bench from hand), `item`, `supporter`, `stadium`, `tool` (`targetId` = host) |
+| `putOnBench` | `player, pokemonId, pokemonName` | a Basic placed on the Bench by an effect |
+| `evolve` | `player, from, to, fromName, toName` | evolve from hand |
+| `attachEnergy` | `player, cardId, cardName, targetId, targetName, source` | `source`: `hand` (manual) or `effect` |
+| `ability` | `player, pokemonId, pokemonName, name` | an Ability is used |
+| `attack` | `player, attackerId, attackerName, attackName, targetId, targetName, damage, ko, copied?, failed?` | pushed when the attack starts (so its coin flips and effects follow it) and finished once resolved: `damage` dealt to the Defending Pokémon after weakness/effects, `ko` = it was Knocked Out by this attack, `copied` = name of the attack a copy effect used (Night Joker), `failed` = `confused` / `attackTry` |
+| `damageCounters` | `player, owner, targetId, targetName, amount, source` | counters placed (+) or removed (-) by effects, bench damage, self damage, confusion; `source` tells which |
+| `ko` | `owner, pokemonId, pokemonName, byAttack, prizesTaken, takenBy` | each Knock Out (followed immediately by its `prize`) |
+| `prize` | `player, count, remaining` | Prizes taken |
+| `switch` | `player, pokemonId, pokemonName, replacedId?, reason` | new Active: `retreat`, `gust` (opponent's Pokémon switched by an effect), `promote` (after a KO), `effect` |
+| `status` | `player, pokemonId, pokemonName, condition` | a Special Condition is applied (`player` = its owner) |
+| `checkup` | `results[]` | Pokémon Checkup outcomes (`poison`/`burn` damage, `burnCured`, `wokeUp`, `paralysisEnded`); omitted if nothing happened |
+| `search` / `discard` / `reveal` | `player, zone, cardIds, ...` | deck/zone searches, discards, revealed cards |
+| `moveInPlay` | `player, pokemonId, pokemonName, to, cardCount` | a whole Pokémon stack moved off the board |
+| `gameEnd` | `winner, reason, turns` | winner set; `playGame` also appends one with `winner: null` for `maxTurns` / `actionLimit` |
+
+Helpers: `formatEvent(e)` renders one event as a line, `logText(state)` the whole stream (what tests use when they want strings).
+`src/sim.ts` derives every statistic from the stream and nothing else: `statsFromEvents(events)` gives per-player KOs, prizes taken, attacks,
+zero-damage attacks and damage dealt; `keyEffectUses(events)` counts the key attacks/abilities (Last-Ditch Catch = a `play` of `Meowth ex`
+immediately followed by a `search`). `GameResult` holds `seed, winner, reason, turns, events, decks, stats`. `exportGamesJsonl(results, path)`
+(CLI: `scripts/sim.mjs ... --jsonl <path>`) writes one line per game, `{seed, decks, winner, reason, turns, events}`, for offline analytics.
+
+## Performance
+
+Greedy-vs-greedy Dragapult vs Zoroark runs at about 100 games/s per core (`node scripts/bench.mjs`), up from about 30. What changed, in order
+of effect, all behaviour-preserving (`src/test/golden.test.ts` replays 50 seeds against `src/test/fixtures/golden-50.json`, generated before
+the speed pass, and demands identical winner, reason and turn count):
+
+1. **Exceptions are not free: keep the frames between `ask` and `runOrPend` small.** A pending choice is a throw, and V8's unwind cost grows
+   with the size of every function it passes through (a ~400-line `runEffect` switch cost ~70 µs per throw, about 17% of runtime). Heavy
+   effect cases are now separate `run_<effect>` functions; the recursive dispatcher is small, and a throw costs ~14 µs. `NeedChoice` is a plain
+   object, not an `Error`, so no stack is captured. Keep new effects out of the `runEffect` switch body.
+2. **Static sources.** `statics.ts` memoizes each card's list of `static` entries (immutable data), so scanning a board of cards with no
+   statics is a few pointer reads, and `withStaticSnapshot(s, fn)` computes the live sources once for a *read-only* scope (all of `enumerate`,
+   the KO sweep). The cache is dropped when the scope ends; nothing is cached across state changes, so effects still stop the moment their
+   source leaves play. Do not mutate the board inside a snapshot scope.
+3. **Cloning.** `cloneState` copies field by field (card-id lists via `slice`) instead of a generic deep clone, and shares what is immutable once
+   created: event objects, markers, `rules`, `stadium`, `pendingChoice` with its `origin.base` snapshot. `enumerate`'s condition scratch is a
+   shallow copy with its own rng and event list rather than a full clone. A test checks the clone equals a deep clone and that mutating it
+   never leaks into the source. Further structural sharing (untouched players/zones) is possible but cloning is now ~2% of a profile.
+4. **Lookups.** `defOf` memoizes iid to `CardDef`; `defIdOf` reads it from the def; `hasSub`/`norm` no longer allocate or run regexes per call.
+5. **Validation.** `applyAction` still checks every action against the legal set. `playGame` passes `{trusted: true}` only when the action is,
+   by identity, one `legalActions` returned for that exact state object (`wasIssued`), skipping a duplicate enumeration. Any other caller,
+   and any agent that builds its own action object, is fully validated. `sameAction` replaced JSON-key comparison.
+
+Profile with `node --cpu-prof scripts/bench.mjs 100`. Remaining cost is mostly garbage collection (~15%), enumeration, and the replay model
+(each choice re-runs its action from the snapshot).

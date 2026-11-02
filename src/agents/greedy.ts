@@ -4,6 +4,7 @@ import { defOf, hasSub, isEnergy, isPokemon } from "../cards/model.js";
 import { canPay, maxHp, providedEnergy } from "../rules.js";
 import { findPokemon, inPlay, other, topDef, type GameState, type PendingChoice, type PlayerId, type PokemonInPlay } from "../state.js";
 import type { Agent } from "./random.js";
+import { missing, tempoInfo, typesOf } from "./tempo.js";
 
 const DRAW_ABILITIES = new Set(["Trade", "Recon Directive", "Flip the Script", "Run Away Draw"]);
 const LINE = /^(Dreepy|Drakloak|Dragapult ex|N's Zorua|N's Zoroark ex)$/;
@@ -114,7 +115,18 @@ export const greedyAgent: Agent = (s) => {
   // 2. evolve whenever legal (prefer the main lines)
   const ev = first("evolve").sort((a, b) => Number(LINE.test(defOf(b.card).name)) - Number(LINE.test(defOf(a.card).name)));
   if (ev[0]) return ev[0];
-  // 3. attach Energy to whoever can attack soonest (active wins ties)
+  // 3. attach Energy: first to the main attacker's line (the Pokémon being evolved included) if the card brings its big attack closer;
+  //    otherwise to whoever can attack soonest (active wins ties)
+  {
+    const info = tempoInfo(s, pl);
+    const toMain = first("attachEnergy").flatMap((a) => {
+      const t = findPokemon(s, a.target)!.p, m = info.get(t);
+      if (!m?.tier1) return [];
+      const cur = missing(m.cost, typesOf(t.energy)), after = missing(m.cost, typesOf([...t.energy, a.card]));
+      return after < cur ? [{ a, after, stage: m.stage, evolved: t.below.length, act: t === me }] : [];
+    }).sort((x, y) => x.after - y.after || y.evolved - x.evolved || Number(y.act) - Number(x.act));
+    if (toMain[0]) return toMain[0].a;
+  }
   const att = first("attachEnergy").map((a) => { const t = findPokemon(s, a.target)!.p; return { a, sf: shortfall(t, [a.card]), cur: shortfall(t), act: t === me }; })
     .filter((x) => x.sf < x.cur || x.cur > 0).sort((x, y) => x.sf - y.sf || Number(y.act) - Number(x.act));
   if (att[0]) return att[0].a;
@@ -142,10 +154,20 @@ export const greedyAgent: Agent = (s) => {
   }
   const st = first("playStadium")[0];
   if (st && !s.stadium) return st;
-  // 7. retreat if the Active can't attack but a benched Pokémon can
-  if (me && !affordable(me).length) {
-    const r = first("retreat").find((a) => { const b = findPokemon(s, a.newActive)!.p; return affordable(b).length > 0; });
-    if (r) return r;
+  // 7. promote the better attacker: retreat when a benched Pokémon can hit clearly harder than the Active (or the Active can't attack at all)
+  if (me && opp.active) {
+    const myBest = bestDmg(s, me, opp.active), kos = myBest > 0 && myBest >= hpLeft(s, opp.active);
+    if (!kos) {
+      const info = tempoInfo(s, pl);
+      const cands = first("retreat").map((a) => ({ a, b: findPokemon(s, a.newActive)!.p })).filter((x) => { const d = bestDmg(s, x.b, opp.active); return d > myBest && (myBest === 0 || d >= myBest + 30); });
+      if (cands.length) {
+        const key = (x: { a: Extract<Action, { type: "retreat" }>; b: PokemonInPlay }) => bestDmg(s, x.b, opp.active);
+        const topB = Math.max(...cands.map(key));
+        // among retreats to the strongest attacker, discard the Energy the Active's own main attack needs least
+        const keep = (x: { a: Extract<Action, { type: "retreat" }> }) => { const m = info.get(me); const left = me.energy.filter((e) => !x.a.energyToDiscard.includes(e)); return m ? missing(m.cost, typesOf(left)) : 0; };
+        return cands.filter((x) => key(x) === topB).sort((x, y) => keep(x) - keep(y))[0]!.a;
+      }
+    }
   }
   // 8. attack: a KO if possible, else the most damage
   const atks = first("attack");

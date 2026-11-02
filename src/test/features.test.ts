@@ -52,7 +52,8 @@ const nsLoop = basic("ns-loop", "N's Loop", 100, ["P"], {
 const joker = basic("joker", "Joker", 100, ["D"], {
   attacks: [{ name: "Night Joker", cost: ["L"], damage: null, effect: { e: "copyAttack", from: { s: "pick", player: "self", where: "bench", filter: { nameIncludes: "N's" }, count: 1, chooser: "self" } } }],
 });
-registerCards([mimicTarget, nsLoop, joker]);
+const mimicTarget2 = basic("ns-mimic2", "N's Mimic", 100, ["P"], { attacks: [{ name: "Jab", cost: [], damage: 30 }] });
+registerCards([mimicTarget, mimicTarget2, nsLoop, joker]);
 
 test("copyAttack: uses a benched N's Pokémon's attack for free, with damage/effects, weakness of the copier's type", () => {
   const s = mainState();
@@ -65,16 +66,27 @@ test("copyAttack: uses a benched N's Pokémon's attack for free, with damage/eff
   assert.ok(n.players[1].active!.status.confused, "copied effect applied");
 });
 
-test("copyAttack: player picks among several N's Pokémon; recursion guard excludes copy attacks", () => {
+test("copyAttack: player picks among several copyable N's Pokémon; Pokémon whose only attack is a copy attack are not offered", () => {
   const s = mainState();
   setActive(s, 0, "joker", { energy: ["energy-l"] });
-  const a = addBench(s, 0, "ns-mimic"), b = addBench(s, 0, "ns-loop");
+  const a = addBench(s, 0, "ns-mimic"), b = addBench(s, 0, "ns-loop"), c = addBench(s, 0, "ns-mimic2");
   setActive(s, 1, "dummy");
   const p = applyAction(s, { type: "attack", attackIndex: 0 });
   assert.equal(p.pendingChoice!.kind, "pokemon");
-  assert.deepEqual([...p.pendingChoice!.options].sort(), [a.iid, b.iid].sort());
-  // choosing the Pokémon whose only attack is itself a copyAttack: nothing to copy, attack does nothing
-  const n = answer(p, [b.iid]);
+  assert.deepEqual([...p.pendingChoice!.options].sort(), [a.iid, c.iid].sort(), "N's Loop (copy-only) is excluded from the sources");
+  assert.ok(!p.pendingChoice!.options.includes(b.iid));
+  const n = answer(p, [c.iid]);
+  assert.equal(n.players[1].active!.damage, 30);
+  assert.equal(n.activePlayer, 1);
+});
+
+test("copyAttack: if the only N's Pokémon on the Bench has nothing copyable, there is no choice and the attack does nothing", () => {
+  const s = mainState();
+  setActive(s, 0, "joker", { energy: ["energy-l"] });
+  addBench(s, 0, "ns-loop");
+  setActive(s, 1, "dummy");
+  const n = applyAction(s, { type: "attack", attackIndex: 0 });
+  assert.equal(n.pendingChoice, undefined);
   assert.equal(n.players[1].active!.damage, 0);
   assert.equal(n.activePlayer, 1);
 });

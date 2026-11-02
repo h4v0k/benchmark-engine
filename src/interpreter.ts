@@ -2,23 +2,27 @@
 // `ask` throws NeedChoice; the caller (game.ts) turns that into state.pendingChoice and later REPLAYS the
 // originating action with the recorded answers (deterministic because the rng lives in the state).
 import type { Amount, CardFilter, CardSel, Condition, Duration, Effect, Entry, PlayerRef, Selector, Status, Trigger, Zone } from "./dsl/types.js";
-import { defOf, isBasicPokemon, matchesFilter } from "./cards/model.js";
+import { defOf, isBasicPokemon, matchesFilter, type AttackDef } from "./cards/model.js";
 import { flip, shuffle } from "./rng.js";
 import {
   type ChoiceReq, type GameState, type Marker, type PlayerId, type PlayerState, type PokemonInPlay,
-  allCardsOf, clearStatuses, drawCards, findPokemon, hasMarker, inPlay, log, markerSum, newPokemon, other,
+  allCardsOf, clearStatuses, drawEmit, emit, findPokemon, hasMarker, inPlay, markerSum, newPokemon, other,
   removeItem, swapActive, topDef,
 } from "./state.js";
+import type { CounterSource, EventOf } from "./events.js";
 import { maxHp, weaknessResistance } from "./rules.js";
 import { abilityLocked, staticPreventsDamage, staticStat } from "./statics.js";
 
-export class NeedChoice extends Error {
-  constructor(public req: ChoiceReq) { super("need choice"); }
+/** Thrown (as a plain object, not an Error: no stack capture) when a decision is needed and no recorded answer exists. */
+export class NeedChoice {
+  constructor(public req: ChoiceReq) {}
 }
 export interface Run {
   s: GameState; answers: string[][]; idx: number;
   /** iids that were at/over lethal damage right after the current attack (for onKnockedOut `byAttack`) */
   attackKOs?: string[];
+  /** the `attack` event of the attack being executed (finished by game.ts; copyAttack records the copied name on it) */
+  attackEvent?: EventOf<"attack">;
 }
 export type CtxKind = "attack" | "ability" | "item" | "supporter" | "stadium" | "tool" | "other";
 export interface Ctx {
@@ -85,7 +89,7 @@ const player1 = (ctx: Ctx, ref: PlayerRef): PlayerId => players(ctx, ref)[0]!;
 const S = (ctx: Ctx): GameState => ctx.run.s;
 export const coin = (s: GameState): boolean => {
   const h = flip(s.rng);
-  s.log.push(`T${s.turn} coin ${h ? "H" : "T"}`);
+  emit(s, { type: "coin", heads: h });
   return h;
 };
 export function zoneArr(ps: PlayerState, z: Zone): string[] {
@@ -204,7 +208,10 @@ export function pickCandidates(ctx: Ctx, sel: Extract<Selector, { s: "pick" }>):
   }
   return cands;
 }
-export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerRef, extra?: CardFilter): PokemonInPlay[] {
+/** Attacks of `p` that copyAttack may use: those that do not themselves copy an attack. */
+const copyableAttacks = (p: PokemonInPlay): Array<{ a: AttackDef; i: number }> =>
+  (topDef(p).attacks ?? []).map((a, i) => ({ a, i })).filter(({ a }) => !JSON.stringify(a.effect ?? null).includes('"copyAttack"'));
+export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerRef, extra?: CardFilter, accept?: (p: PokemonInPlay) => boolean): PokemonInPlay[] {
   const s = S(ctx);
   switch (sel.s) {
     case "self": return ctx.self && findPokemon(s, ctx.self) ? [byIid(s, ctx.self)] : [];
@@ -216,7 +223,7 @@ export function selectPokemon(ctx: Ctx, sel: Selector, chooserOverride?: PlayerR
       for (const pl of players(ctx, sel.player)) {
         const ps = s.players[pl];
         const list = sel.where === "active" ? (ps.active ? [ps.active] : []) : sel.where === "bench" ? ps.bench : inPlay(ps);
-        for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p)) && matchesFilter(topDef(p), extra, pokemonFacts(p))) cands.push(p);
+        for (const p of list) if (matchesFilter(topDef(p), sel.filter, pokemonFacts(p)) && matchesFilter(topDef(p), extra, pokemonFacts(p)) && (!accept || accept(p))) cands.push(p);
       }
       const { min, max } = countRange(ctx, sel.count);
       if (sel.mode === "all" || sel.mode === "divide" || min === Infinity) return cands;
@@ -254,7 +261,7 @@ function selectCards(ctx: Ctx, sel: CardSel, owner: PlayerId, upTo: boolean): Pi
   }
   const chooser = player1(ctx, sel.chooser ?? "self");
   const picks = ask(ctx.run, { player: chooser, kind: "cards", options: ids, min: lo, max: hi, prompt: `choose cards from ${sel.zone}` });
-  if (sel.reveal && picks.length) log(s, `P${chooser} reveals ${picks.map((p) => defOf(p).name).join(", ")}`);
+  if (sel.reveal && picks.length) emit(s, { type: "reveal", player: chooser, cardIds: picks.slice(), cardNames: picks.map((p) => defOf(p).name) });
   return { owner, ids: picks };
 }
 function detach(s: GameState, ids: string[]): void {
@@ -289,7 +296,7 @@ function placeCards(run: Run, owner: PlayerId, to: Zone, ids: string[], pos?: "t
     case "bench":
       for (const id of ids) {
         const p = addToBench(s, owner, id);
-        if (!p) ps.discard.push(id); else { log(s, `P${owner} puts ${defOf(id).name} onto the Bench`); fireOnBenched(run, p, owner, false); }
+        if (!p) ps.discard.push(id); else { emit(s, { type: "putOnBench", player: owner, pokemonId: id, pokemonName: defOf(id).name }); fireOnBenched(run, p, owner, false); }
       }
       break;
     default: throw new Error(`cannot place cards into ${to}`);
@@ -310,6 +317,12 @@ export function applyDamage(s: GameState, target: PokemonInPlay, amount: number,
   d = Math.max(0, d);
   target.damage += d;
   return d;
+}
+
+/** Record damage counters placed on (+) / removed from (-) `t` by an effect. */
+function counterEvent(ctx: Ctx, t: PokemonInPlay, amount: number, source: CounterSource): void {
+  const loc = findPokemon(S(ctx), t.iid);
+  emit(S(ctx), { type: "damageCounters", player: ctx.player, owner: loc?.player ?? ctx.player, targetId: t.iid, targetName: topDef(t).name, amount, source });
 }
 
 // ------------------------------------------------------------------ durations / markers
@@ -336,6 +349,291 @@ function mark(ctx: Ctx, who: Selector, key: string, d: Duration, value?: number,
 }
 
 // ------------------------------------------------------------------ effects
+// One function per heavy effect keeps `runEffect` (the recursive dispatcher) small: exception unwinding for a pending choice walks every
+// frame between the throw and `runOrPend`, and its cost grows with each frame function's size (docs/ENGINE.md, Performance).
+
+function run_damage(ctx: Ctx, e: Extract<Effect, { e: "damage" }>): void {
+  const s = S(ctx);
+    const amt = evalAmount(ctx, e.amount);
+    const attacker = ctx.self && findPokemon(s, ctx.self) ? byIid(s, ctx.self) : undefined;
+    for (const t of selectPokemon(ctx, e.to)) {
+      const loc = findPokemon(s, t.iid)!;
+      const isDefActive = loc.player !== ctx.player && loc.where === "active";
+      if (ctx.kind === "attack" && isDefActive && e.weakRes !== false) { ctx.dmg = (ctx.dmg ?? 0) + amt; if (e.effects === false) ctx.ignoreDefEffects = true; }
+      else {
+        const dealt = applyDamage(s, t, amt, { attacker, wr: e.weakRes === true && isDefActive, byAttack: ctx.kind === "attack", ignoreEffects: e.effects === false });
+        if (dealt > 0) counterEvent(ctx, t, dealt / 10, ctx.kind === "attack" ? "bench" : "effect");
+        if (ctx.kind === "attack") fireOnDamaged(ctx.run, attacker, t, dealt);
+      }
+    }
+    return;
+}
+
+function run_counters(ctx: Ctx, e: Extract<Effect, { e: "counters" }>): void {
+  const s = S(ctx);
+    const n = evalAmount(ctx, e.n);
+    const targets = selectPokemon(ctx, e.to).filter((t) => e.remove || !shielded(ctx, t));
+    if (!targets.length) return;
+    if (e.remove) {
+      for (const t of targets) { const before = t.damage; t.damage = Math.max(0, t.damage - n * 10); if (before !== t.damage) counterEvent(ctx, t, (t.damage - before) / 10, "heal"); }
+      return;
+    }
+    if (!e.distribute || targets.length === 1) { for (const t of targets) { t.damage += n * 10; if (n > 0) counterEvent(ctx, t, n, "effect"); } return; }
+    if (!(n > 0) || n === Infinity) return;
+    const picks = ask(ctx.run, { player: ctx.player, kind: "distribute", options: targets.map((t) => t.iid), min: n, max: n, prompt: `distribute ${n} damage counters` });
+    for (const pk of picks) { const [id, c] = pk.split("="); const t = byIid(s, id!); t.damage += Number(c) * 10; counterEvent(ctx, t, Number(c), "effect"); }
+    return;
+}
+
+function run_moveCounters(ctx: Ctx, e: Extract<Effect, { e: "moveCounters" }>): void {
+  const s = S(ctx);
+    const [from] = selectPokemon(ctx, e.from);
+    const [to] = selectPokemon(ctx, e.to);
+    if (!from || !to || from === to) { ctx.didPrev = false; return; }
+    const { min, max } = countRange(ctx, e.n);
+    const hi = Math.min(max, from.damage / 10), lo = Math.min(min, hi);
+    const opts: string[] = [];
+    for (let k = lo; k <= hi; k++) opts.push(String(k));
+    const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: opts, min: 1, max: 1, prompt: "damage counters to move" });
+    const k = Number(pick ?? 0);
+    from.damage -= k * 10; to.damage += k * 10;
+    ctx.didPrev = k > 0;
+    if (k > 0) { counterEvent(ctx, from, -k, "move"); counterEvent(ctx, to, k, "move"); }
+    return;
+}
+
+function run_searchSplit(ctx: Ctx, e: Extract<Effect, { e: "searchSplit" }>): void {
+  const s = S(ctx);
+    for (const pl of players(ctx, e.player)) {
+      const ps = s.players[pl];
+      const arr = zoneArr(ps, e.zone ?? "deck");
+      const cands = arr.filter((c) => cardMatches(c, e.filter));
+      const key = (c: string) => (e.distinct === "name" ? defOf(c).name : (defOf(c).types ?? []).join(""));
+      const picked: string[] = [];
+      for (let i = 0; i < e.upTo; i++) {
+        const opts = cands.filter((c) => !picked.includes(c) && (!e.distinct || !picked.some((q) => key(q) === key(c))));
+        if (!opts.length) break;
+        const [c] = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: 0, max: 1, prompt: "search" });
+        if (!c) break;
+        picked.push(c);
+      }
+      for (const c of picked) removeItem(arr, c);
+      if (picked.length) emit(s, { type: "reveal", player: pl, cardIds: picked.slice(), cardNames: picked.map((c) => defOf(c).name) });
+      let toHand = picked, toAttach: string[] = [];
+      if (picked.length === 2) {
+        const [h] = ask(ctx.run, { player: ctx.player, kind: "cards", options: picked, min: 1, max: 1, prompt: "put into your hand (the other is attached)" });
+        toHand = [h!]; toAttach = picked.filter((c) => c !== h);
+      }
+      ps.hand.push(...toHand);
+      if (toAttach.length) {
+        const [target] = selectPokemon(ctx, e.b.attachTo);
+        if (target) target.energy.push(...toAttach); else ps.hand.push(...toAttach);
+      }
+      if (e.shuffle !== false) shuffle(ps.deck, s.rng);
+      ctx.didPrev = picked.length > 0;
+    }
+    return;
+}
+
+function run_flip(ctx: Ctx, e: Extract<Effect, { e: "flip" }>): void {
+  const s = S(ctx);
+    if (e.n === undefined) { if (coin(s)) { if (e.heads) runEffect(ctx, e.heads); } else if (e.tails) runEffect(ctx, e.tails); return; }
+    const n = evalAmount(ctx, e.n);
+    for (let i = 0; i < n; i++) {
+      const h = coin(s);
+      if (e.each) runEffect(ctx, e.each);
+      if (h && e.heads) runEffect(ctx, e.heads);
+      if (!h && e.tails) runEffect(ctx, e.tails);
+    }
+    return;
+}
+
+function run_search(ctx: Ctx, e: Extract<Effect, { e: "search" }>): void {
+  const s = S(ctx);
+    for (const pl of players(ctx, e.player)) {
+      let sel: CardSel = { ...e.sel, player: "self" };
+      if (e.to === "bench") { // can't put more cards onto the Bench than there is room for
+        const free = Math.max(0, s.rules.benchSize - s.players[pl].bench.length);
+        if (countRange(ctx, sel.count).max > free) sel = { ...sel, count: { k: "upTo", n: free } };
+      }
+      const { ids } = selectCards(ctx, sel, pl, true);
+      removeCards(s, pl, e.sel.zone, ids);
+      if (e.to === "attached") throw new Error("search→attached: use attachEnergy");
+      placeCards(ctx.run, pl, e.to, ids);
+      if (e.shuffle) shuffle(s.players[pl].deck, s.rng);
+      emit(s, { type: "search", player: pl, zone: e.sel.zone, cardIds: ids.slice(), cardNames: ids.map((i) => defOf(i).name) });
+      ctx.didPrev = ids.length > 0;
+    }
+    return;
+}
+
+function run_discard(ctx: Ctx, e: Extract<Effect, { e: "discard" }>): void {
+  const s = S(ctx);
+    for (const pl of players(ctx, e.sel.player)) {
+      const { ids } = selectCards(ctx, e.sel, pl, false);
+      removeCards(s, pl, e.sel.zone, ids);
+      s.players[pl].discard.push(...ids);
+      ctx.discarded = ids.length; ctx.didPrev = ids.length > 0;
+      emit(s, { type: "discard", player: pl, zone: e.sel.zone, cardIds: ids.slice() });
+    }
+    return;
+}
+
+function run_move(ctx: Ctx, e: Extract<Effect, { e: "move" }>): void {
+  const s = S(ctx);
+    if (e.sel.zone === "play" || e.sel.zone === "active" || e.sel.zone === "bench") {
+      // move whole in-play Pokémon stacks (Pokémon + evolutions + Energy + Tool) to another zone
+      const pokes = e.sel.from ? selectPokemon(ctx, e.sel.from) : selectPokemon(ctx, { s: "pick", player: e.sel.player, where: e.sel.zone, filter: e.sel.filter, count: e.sel.count, chooser: e.sel.chooser });
+      for (const p of pokes) {
+        const loc = findPokemon(s, p.iid);
+        if (!loc) continue;
+        const ps = s.players[loc.player];
+        if (ps.active === p) ps.active = null; else removeItem(ps.bench, p);
+        const cards = allCardsOf(p);
+        if (e.shuffleFirst) shuffle(cards, s.rng);
+        emit(s, { type: "moveInPlay", player: loc.player, pokemonId: p.iid, pokemonName: topDef(p).name, to: e.to, cardCount: cards.length });
+        placeCards(ctx.run, loc.player, e.to, cards, e.position);
+        ctx.didPrev = true;
+      }
+      return;
+    }
+    for (const pl of players(ctx, e.sel.player)) {
+      const { ids } = selectCards(ctx, e.sel, pl, false);
+      removeCards(s, pl, e.sel.zone, ids);
+      if (e.shuffleFirst) shuffle(ids, s.rng);
+      placeCards(ctx.run, pl, e.to, ids, e.position);
+      ctx.didPrev = ids.length > 0;
+    }
+    return;
+}
+
+function run_look(ctx: Ctx, e: Extract<Effect, { e: "look" }>): void {
+  const s = S(ctx);
+    for (const pl of players(ctx, e.player)) {
+      const ps = s.players[pl];
+      const n = evalAmount(ctx, e.n);
+      const top = zoneArr(ps, e.zone).slice(0, n);
+      const take = e.take === undefined ? 0 : evalAmount(ctx, e.take);
+      const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: Math.min(take, top.length), max: Math.min(take, top.length), prompt: "take cards" });
+      for (const t of taken) removeItem(zoneArr(ps, e.zone), t);
+      ps.hand.push(...taken);
+      const rest = top.filter((t) => !taken.includes(t));
+      if (e.rest === "discard") { for (const r of rest) removeItem(zoneArr(ps, e.zone), r); ps.discard.push(...rest); }
+      else if (e.rest === "bottom") { for (const r of rest) removeItem(ps.deck, r); ps.deck.push(...rest); }
+    }
+    return;
+}
+
+function run_attachEnergy(ctx: Ctx, e: Extract<Effect, { e: "attachEnergy" }>): void {
+  const s = S(ctx);
+    const owner = ctx.player;
+    const { ids } = selectCards(ctx, e.sel, owner, false); // exact counts are mandatory ("Attach a Basic Energy card"); `upTo` counts stay optional
+    if (!ids.length) { ctx.didPrev = false; return; }
+    const [target] = selectPokemon(ctx, e.to);
+    if (!target) return;
+    removeCards(s, owner, e.sel.zone, ids);
+    target.energy.push(...ids);
+    if (e.sel.zone === "deck") shuffle(s.players[owner].deck, s.rng);
+    for (const id of ids) emit(s, { type: "attachEnergy", player: owner, cardId: id, cardName: defOf(id).name, targetId: target.iid, targetName: topDef(target).name, source: "effect" });
+    ctx.didPrev = true;
+    return;
+}
+
+function run_moveEnergy(ctx: Ctx, e: Extract<Effect, { e: "moveEnergy" }>): void {
+  const s = S(ctx);
+    const [from] = selectPokemon(ctx, e.from);
+    const [to] = selectPokemon(ctx, e.to);
+    if (!from || !to) return;
+    const opts = from.energy.filter((c) => cardMatches(c, e.filter));
+    const { min, max } = countRange(ctx, e.count);
+    const picks = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: Math.min(min, opts.length), max: Math.min(max, opts.length), prompt: "move energy" });
+    from.energy = from.energy.filter((c) => !picks.includes(c));
+    to.energy.push(...picks);
+    return;
+}
+
+function run_putOnBench(ctx: Ctx, e: Extract<Effect, { e: "putOnBench" }>): void {
+  const s = S(ctx);
+    const { ids } = selectCards(ctx, e.sel, ctx.player, true);
+    removeCards(s, ctx.player, e.sel.zone, ids);
+    for (const id of ids) if (isBasicPokemon(defOf(id))) {
+      const p = addToBench(s, ctx.player, id);
+      if (!p) s.players[ctx.player].discard.push(id); else { emit(s, { type: "putOnBench", player: ctx.player, pokemonId: id, pokemonName: defOf(id).name }); fireOnBenched(ctx.run, p, ctx.player, false); }
+    }
+    if (e.sel.zone === "deck") shuffle(s.players[ctx.player].deck, s.rng);
+    return;
+}
+
+function run_returnToHand(ctx: Ctx, e: Extract<Effect, { e: "returnToHand" }>): void {
+  const s = S(ctx);
+    for (const t of selectPokemon(ctx, e.who)) {
+      const loc = findPokemon(s, t.iid)!;
+      const ps = s.players[loc.player];
+      if (ps.active === t) ps.active = null; else removeItem(ps.bench, t);
+      ps.hand.push(t.iid, ...t.below);
+      if (e.withAttached) ps.hand.push(...t.energy, ...(t.tool ? [t.tool] : [])); else ps.discard.push(...t.energy, ...(t.tool ? [t.tool] : []));
+    }
+    return;
+}
+
+function run_switch(ctx: Ctx, e: Extract<Effect, { e: "switch" }>): void {
+  const s = S(ctx);
+    for (const pl of players(ctx, e.player)) {
+      const ps = s.players[pl];
+      if (!ps.active || !ps.bench.length) continue;
+      const [t] = selectPokemon(ctx, e.whichBench, e.chooser);
+      if (!t || !ps.bench.includes(t)) continue;
+      const replacedId = ps.active.iid;
+      swapActive(s, pl, t.iid);
+      emit(s, { type: "switch", player: pl, pokemonId: t.iid, pokemonName: topDef(t).name, replacedId, reason: pl !== ctx.player ? "gust" : "effect" });
+    }
+    return;
+}
+
+function run_lock(ctx: Ctx, e: Extract<Effect, { e: "lock" }>): void {
+  const s = S(ctx);
+    const l = e.what, d = e.duration;
+    switch (l.l) {
+      case "attack": mark(ctx, l.who, l.attackName ? `noAttack:${l.attackName}` : "noAttack", d); return;
+      case "retreat": mark(ctx, l.who, "noRetreat", d); return;
+      case "attackTry": mark(ctx, l.who, "attackTry", d); return;
+      case "heal": mark(ctx, l.who, "noHeal", d); return;
+      case "status": mark(ctx, l.who, "noStatus", d); return;
+      case "play": {
+        const x = expiry(s, d);
+        if (x === "now") return;
+        const kind = l.filter.subtype?.[0] ?? "item";
+        for (const pl of players(ctx, l.player)) s.players[pl].markers.push({ key: `noPlay:${kind}`, expiresAfterTurn: x });
+        return;
+      }
+      case "ability": {
+        const x = expiry(s, d);
+        if (x === "now") return;
+        for (const ps of s.players) ps.markers.push({ key: "noAbility", expiresAfterTurn: x });
+        return;
+      }
+    }
+    return;
+}
+
+function run_copyAttack(ctx: Ctx, e: Extract<Effect, { e: "copyAttack" }>): void {
+  const s = S(ctx);
+    if (ctx.copying) return; // a copied attack cannot itself copy
+    // only Pokémon with at least one copyable attack are offered (a Zoroark ex whose only attack is Night Joker is not a valid source)
+    const [src] = selectPokemon(ctx, e.from, undefined, e.filter, (p) => copyableAttacks(p).length > 0);
+    if (!src) return;
+    const atks = copyableAttacks(src);
+    if (!atks.length) return;
+    const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: atks.map(({ i }) => String(i)), min: 1, max: 1, prompt: `choose an attack of ${topDef(src).name} to use` });
+    const a = topDef(src).attacks![Number(pick)]!;
+    if (ctx.run.attackEvent && ctx.kind === "attack") ctx.run.attackEvent.copied = a.name;
+    ctx.copying = true;
+    ctx.dmg = a.damage && a.damage > 0 ? a.damage : null;
+    if (a.effect) runEffect(ctx, a.effect);
+    ctx.copying = false;
+    return;
+}
+
 export function runEffect(ctx: Ctx, e: Effect): void {
   const s = S(ctx);
   switch (e.e) {
@@ -362,101 +660,32 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     }
     case "cost": runEffect(ctx, e.pay); runEffect(ctx, e.then); return;
 
-    case "damage": {
-      const amt = evalAmount(ctx, e.amount);
-      const attacker = ctx.self && findPokemon(s, ctx.self) ? byIid(s, ctx.self) : undefined;
-      for (const t of selectPokemon(ctx, e.to)) {
-        const loc = findPokemon(s, t.iid)!;
-        const isDefActive = loc.player !== ctx.player && loc.where === "active";
-        if (ctx.kind === "attack" && isDefActive && e.weakRes !== false) { ctx.dmg = (ctx.dmg ?? 0) + amt; if (e.effects === false) ctx.ignoreDefEffects = true; }
-        else {
-          const dealt = applyDamage(s, t, amt, { attacker, wr: e.weakRes === true && isDefActive, byAttack: ctx.kind === "attack", ignoreEffects: e.effects === false });
-          if (ctx.kind === "attack") fireOnDamaged(ctx.run, attacker, t, dealt);
-        }
-      }
-      return;
-    }
+    case "damage": return run_damage(ctx, e);
     case "damageMod": ctx.mods += evalAmount(ctx, e.amount); return;
-    case "selfDamage": { const p = ctx.self ? findPokemon(s, ctx.self)?.p : undefined; if (p) applyDamage(s, p, evalAmount(ctx, e.amount), { wr: false }); return; }
+    case "selfDamage": {
+      const p = ctx.self ? findPokemon(s, ctx.self)?.p : undefined;
+      if (p) { const d = applyDamage(s, p, evalAmount(ctx, e.amount), { wr: false }); if (d > 0) counterEvent(ctx, p, d / 10, "self"); }
+      return;
+    }
     case "heal":
-      for (const t of selectPokemon(ctx, e.to)) if (!hasMarker(t.markers, "noHeal")) t.damage = Math.max(0, t.damage - evalAmount(ctx, e.amount));
-      return;
-    case "counters": {
-      const n = evalAmount(ctx, e.n);
-      const targets = selectPokemon(ctx, e.to).filter((t) => e.remove || !shielded(ctx, t));
-      if (!targets.length) return;
-      if (e.remove) { for (const t of targets) t.damage = Math.max(0, t.damage - n * 10); return; }
-      if (!e.distribute || targets.length === 1) { for (const t of targets) t.damage += n * 10; return; }
-      if (!(n > 0) || n === Infinity) return;
-      const picks = ask(ctx.run, { player: ctx.player, kind: "distribute", options: targets.map((t) => t.iid), min: n, max: n, prompt: `distribute ${n} damage counters` });
-      for (const pk of picks) { const [id, c] = pk.split("="); byIid(s, id!).damage += Number(c) * 10; }
-      return;
-    }
-    case "moveCounters": {
-      const [from] = selectPokemon(ctx, e.from);
-      const [to] = selectPokemon(ctx, e.to);
-      if (!from || !to || from === to) { ctx.didPrev = false; return; }
-      const { min, max } = countRange(ctx, e.n);
-      const hi = Math.min(max, from.damage / 10), lo = Math.min(min, hi);
-      const opts: string[] = [];
-      for (let k = lo; k <= hi; k++) opts.push(String(k));
-      const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: opts, min: 1, max: 1, prompt: "damage counters to move" });
-      const k = Number(pick ?? 0);
-      from.damage -= k * 10; to.damage += k * 10;
-      ctx.didPrev = k > 0;
-      log(s, `${k} damage counter(s) moved from ${topDef(from).name} to ${topDef(to).name}`);
-      return;
-    }
-    case "searchSplit": {
-      for (const pl of players(ctx, e.player)) {
-        const ps = s.players[pl];
-        const arr = zoneArr(ps, e.zone ?? "deck");
-        const cands = arr.filter((c) => cardMatches(c, e.filter));
-        const key = (c: string) => (e.distinct === "name" ? defOf(c).name : (defOf(c).types ?? []).join(""));
-        const picked: string[] = [];
-        for (let i = 0; i < e.upTo; i++) {
-          const opts = cands.filter((c) => !picked.includes(c) && (!e.distinct || !picked.some((q) => key(q) === key(c))));
-          if (!opts.length) break;
-          const [c] = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: 0, max: 1, prompt: "search" });
-          if (!c) break;
-          picked.push(c);
-        }
-        for (const c of picked) removeItem(arr, c);
-        if (picked.length) log(s, `P${pl} reveals ${picked.map((c) => defOf(c).name).join(", ")}`);
-        let toHand = picked, toAttach: string[] = [];
-        if (picked.length === 2) {
-          const [h] = ask(ctx.run, { player: ctx.player, kind: "cards", options: picked, min: 1, max: 1, prompt: "put into your hand (the other is attached)" });
-          toHand = [h!]; toAttach = picked.filter((c) => c !== h);
-        }
-        ps.hand.push(...toHand);
-        if (toAttach.length) {
-          const [target] = selectPokemon(ctx, e.b.attachTo);
-          if (target) target.energy.push(...toAttach); else ps.hand.push(...toAttach);
-        }
-        if (e.shuffle !== false) shuffle(ps.deck, s.rng);
-        ctx.didPrev = picked.length > 0;
+      for (const t of selectPokemon(ctx, e.to)) if (!hasMarker(t.markers, "noHeal")) {
+        const before = t.damage;
+        t.damage = Math.max(0, t.damage - evalAmount(ctx, e.amount));
+        if (before !== t.damage) counterEvent(ctx, t, (t.damage - before) / 10, "heal");
       }
       return;
-    }
+    case "counters": return run_counters(ctx, e);
+    case "moveCounters": return run_moveCounters(ctx, e);
+    case "searchSplit": return run_searchSplit(ctx, e);
     case "knockOut": for (const t of selectPokemon(ctx, e.who)) t.damage = Math.max(t.damage, maxHp(s, t)); return;
 
-    case "flip": {
-      if (e.n === undefined) { if (coin(s)) { if (e.heads) runEffect(ctx, e.heads); } else if (e.tails) runEffect(ctx, e.tails); return; }
-      const n = evalAmount(ctx, e.n);
-      for (let i = 0; i < n; i++) {
-        const h = coin(s);
-        if (e.each) runEffect(ctx, e.each);
-        if (h && e.heads) runEffect(ctx, e.heads);
-        if (!h && e.tails) runEffect(ctx, e.tails);
-      }
-      return;
-    }
+    case "flip": return run_flip(ctx, e);
     case "status":
       for (const t of selectPokemon(ctx, e.to)) {
         if (findPokemon(s, t.iid)?.where !== "active" || hasMarker(t.markers, "noStatus") || hasMarker(t.markers, "preventEffects")) continue;
         if (e.status === "asleep" || e.status === "paralyzed" || e.status === "confused") { t.status.asleep = t.status.paralyzed = t.status.confused = false; }
         t.status[statusKey(e.status)] = true;
-        log(s, `${topDef(t).name} is now ${e.status}`);
+        emit(s, { type: "status", player: findPokemon(s, t.iid)!.player, pokemonId: t.iid, pokemonName: topDef(t).name, condition: e.status });
       }
       return;
     case "clearStatus": for (const t of selectPokemon(ctx, e.to)) clearStatuses(t); return;
@@ -464,168 +693,30 @@ export function runEffect(ctx: Ctx, e: Effect): void {
     case "draw": {
       for (const pl of players(ctx, e.player)) {
         const n = e.untilHand !== undefined ? Math.max(0, evalAmount(ctx, e.untilHand) - s.players[pl].hand.length) : evalAmount(ctx, e.n);
-        const k = drawCards(s, pl, n);
-        log(s, `P${pl} draws ${k}`);
+        const k = drawEmit(s, pl, n, "effect");
         ctx.didPrev = k > 0;
       }
       return;
     }
     case "shuffle": for (const pl of players(ctx, e.player)) shuffle(zoneArr(s.players[pl], e.zone), s.rng); return;
-    case "search": {
-      for (const pl of players(ctx, e.player)) {
-        let sel: CardSel = { ...e.sel, player: "self" };
-        if (e.to === "bench") { // can't put more cards onto the Bench than there is room for
-          const free = Math.max(0, s.rules.benchSize - s.players[pl].bench.length);
-          if (countRange(ctx, sel.count).max > free) sel = { ...sel, count: { k: "upTo", n: free } };
-        }
-        const { ids } = selectCards(ctx, sel, pl, true);
-        removeCards(s, pl, e.sel.zone, ids);
-        if (e.to === "attached") throw new Error("search→attached: use attachEnergy");
-        placeCards(ctx.run, pl, e.to, ids);
-        if (e.shuffle) shuffle(s.players[pl].deck, s.rng);
-        log(s, `P${pl} searches ${e.sel.zone}: ${ids.length ? ids.map((i) => defOf(i).name).join(", ") : "nothing"}`);
-        ctx.didPrev = ids.length > 0;
-      }
-      return;
-    }
-    case "discard": {
-      for (const pl of players(ctx, e.sel.player)) {
-        const { ids } = selectCards(ctx, e.sel, pl, false);
-        removeCards(s, pl, e.sel.zone, ids);
-        s.players[pl].discard.push(...ids);
-        ctx.discarded = ids.length; ctx.didPrev = ids.length > 0;
-        log(s, `P${pl} discards ${ids.length} from ${e.sel.zone}`);
-      }
-      return;
-    }
-    case "move": {
-      if (e.sel.zone === "play" || e.sel.zone === "active" || e.sel.zone === "bench") {
-        // move whole in-play Pokémon stacks (Pokémon + evolutions + Energy + Tool) to another zone
-        const pokes = e.sel.from ? selectPokemon(ctx, e.sel.from) : selectPokemon(ctx, { s: "pick", player: e.sel.player, where: e.sel.zone, filter: e.sel.filter, count: e.sel.count, chooser: e.sel.chooser });
-        for (const p of pokes) {
-          const loc = findPokemon(s, p.iid);
-          if (!loc) continue;
-          const ps = s.players[loc.player];
-          if (ps.active === p) ps.active = null; else removeItem(ps.bench, p);
-          const cards = allCardsOf(p);
-          if (e.shuffleFirst) shuffle(cards, s.rng);
-          log(s, `P${loc.player} moves ${topDef(p).name} and ${cards.length - 1} attached/stacked card(s) to ${e.to}`);
-          placeCards(ctx.run, loc.player, e.to, cards, e.position);
-          ctx.didPrev = true;
-        }
-        return;
-      }
-      for (const pl of players(ctx, e.sel.player)) {
-        const { ids } = selectCards(ctx, e.sel, pl, false);
-        removeCards(s, pl, e.sel.zone, ids);
-        if (e.shuffleFirst) shuffle(ids, s.rng);
-        placeCards(ctx.run, pl, e.to, ids, e.position);
-        ctx.didPrev = ids.length > 0;
-      }
-      return;
-    }
-    case "look": {
-      for (const pl of players(ctx, e.player)) {
-        const ps = s.players[pl];
-        const n = evalAmount(ctx, e.n);
-        const top = zoneArr(ps, e.zone).slice(0, n);
-        const take = e.take === undefined ? 0 : evalAmount(ctx, e.take);
-        const taken = ask(ctx.run, { player: ctx.player, kind: "cards", options: top, min: Math.min(take, top.length), max: Math.min(take, top.length), prompt: "take cards" });
-        for (const t of taken) removeItem(zoneArr(ps, e.zone), t);
-        ps.hand.push(...taken);
-        const rest = top.filter((t) => !taken.includes(t));
-        if (e.rest === "discard") { for (const r of rest) removeItem(zoneArr(ps, e.zone), r); ps.discard.push(...rest); }
-        else if (e.rest === "bottom") { for (const r of rest) removeItem(ps.deck, r); ps.deck.push(...rest); }
-      }
-      return;
-    }
+    case "search": return run_search(ctx, e);
+    case "discard": return run_discard(ctx, e);
+    case "move": return run_move(ctx, e);
+    case "look": return run_look(ctx, e);
     case "reveal": {
       for (const pl of players(ctx, e.player)) {
         const { ids } = selectCards(ctx, e.sel, pl, true);
-        log(s, `P${pl} reveals ${ids.map((i) => defOf(i).name).join(", ")}`);
+        emit(s, { type: "reveal", player: pl, cardIds: ids.slice(), cardNames: ids.map((i) => defOf(i).name) });
       }
       return;
     }
-    case "attachEnergy": {
-      const owner = ctx.player;
-      const { ids } = selectCards(ctx, e.sel, owner, false); // exact counts are mandatory ("Attach a Basic Energy card"); `upTo` counts stay optional
-      if (!ids.length) { ctx.didPrev = false; return; }
-      const [target] = selectPokemon(ctx, e.to);
-      if (!target) return;
-      removeCards(s, owner, e.sel.zone, ids);
-      target.energy.push(...ids);
-      if (e.sel.zone === "deck") shuffle(s.players[owner].deck, s.rng);
-      log(s, `P${owner} attaches ${ids.length} energy to ${topDef(target).name}`);
-      ctx.didPrev = true;
-      return;
-    }
-    case "moveEnergy": {
-      const [from] = selectPokemon(ctx, e.from);
-      const [to] = selectPokemon(ctx, e.to);
-      if (!from || !to) return;
-      const opts = from.energy.filter((c) => cardMatches(c, e.filter));
-      const { min, max } = countRange(ctx, e.count);
-      const picks = ask(ctx.run, { player: ctx.player, kind: "cards", options: opts, min: Math.min(min, opts.length), max: Math.min(max, opts.length), prompt: "move energy" });
-      from.energy = from.energy.filter((c) => !picks.includes(c));
-      to.energy.push(...picks);
-      return;
-    }
-    case "putOnBench": {
-      const { ids } = selectCards(ctx, e.sel, ctx.player, true);
-      removeCards(s, ctx.player, e.sel.zone, ids);
-      for (const id of ids) if (isBasicPokemon(defOf(id))) {
-        const p = addToBench(s, ctx.player, id);
-        if (!p) s.players[ctx.player].discard.push(id); else { log(s, `P${ctx.player} puts ${defOf(id).name} onto the Bench`); fireOnBenched(ctx.run, p, ctx.player, false); }
-      }
-      if (e.sel.zone === "deck") shuffle(s.players[ctx.player].deck, s.rng);
-      return;
-    }
-    case "returnToHand": {
-      for (const t of selectPokemon(ctx, e.who)) {
-        const loc = findPokemon(s, t.iid)!;
-        const ps = s.players[loc.player];
-        if (ps.active === t) ps.active = null; else removeItem(ps.bench, t);
-        ps.hand.push(t.iid, ...t.below);
-        if (e.withAttached) ps.hand.push(...t.energy, ...(t.tool ? [t.tool] : [])); else ps.discard.push(...t.energy, ...(t.tool ? [t.tool] : []));
-      }
-      return;
-    }
-    case "switch": {
-      for (const pl of players(ctx, e.player)) {
-        const ps = s.players[pl];
-        if (!ps.active || !ps.bench.length) continue;
-        const [t] = selectPokemon(ctx, e.whichBench, e.chooser);
-        if (!t || !ps.bench.includes(t)) continue;
-        log(s, `P${pl} switches ${topDef(ps.active).name} for ${topDef(t).name}`);
-        swapActive(s, pl, t.iid);
-      }
-      return;
-    }
+    case "attachEnergy": return run_attachEnergy(ctx, e);
+    case "moveEnergy": return run_moveEnergy(ctx, e);
+    case "putOnBench": return run_putOnBench(ctx, e);
+    case "returnToHand": return run_returnToHand(ctx, e);
+    case "switch": return run_switch(ctx, e);
     case "retreatCost": mark(ctx, e.who, "mod:retreat", e.duration, e.delta); return;
-    case "lock": {
-      const l = e.what, d = e.duration;
-      switch (l.l) {
-        case "attack": mark(ctx, l.who, l.attackName ? `noAttack:${l.attackName}` : "noAttack", d); return;
-        case "retreat": mark(ctx, l.who, "noRetreat", d); return;
-        case "attackTry": mark(ctx, l.who, "attackTry", d); return;
-        case "heal": mark(ctx, l.who, "noHeal", d); return;
-        case "status": mark(ctx, l.who, "noStatus", d); return;
-        case "play": {
-          const x = expiry(s, d);
-          if (x === "now") return;
-          const kind = l.filter.subtype?.[0] ?? "item";
-          for (const pl of players(ctx, l.player)) s.players[pl].markers.push({ key: `noPlay:${kind}`, expiresAfterTurn: x });
-          return;
-        }
-        case "ability": {
-          const x = expiry(s, d);
-          if (x === "now") return;
-          for (const ps of s.players) ps.markers.push({ key: "noAbility", expiresAfterTurn: x });
-          return;
-        }
-      }
-      return;
-    }
+    case "lock": return run_lock(ctx, e);
     case "prevent":
       if (e.from === "damage" || e.from === "both") mark(ctx, e.who, "preventDamage", e.duration);
       if (e.from === "effects" || e.from === "both") mark(ctx, e.who, "preventEffects", e.duration);
@@ -644,21 +735,7 @@ export function runEffect(ctx: Ctx, e: Effect): void {
       if (x !== "now") s.players[ctx.player].markers.push({ key: `tag:${e.key}`, expiresAfterTurn: x });
       return;
     }
-    case "copyAttack": {
-      if (ctx.copying) return; // a copied attack cannot itself copy
-      const [src] = selectPokemon(ctx, e.from, undefined, e.filter);
-      if (!src) return;
-      const atks = (topDef(src).attacks ?? []).map((a, i) => ({ a, i })).filter(({ a }) => !JSON.stringify(a.effect ?? null).includes('"copyAttack"'));
-      if (!atks.length) return;
-      const [pick] = ask(ctx.run, { player: ctx.player, kind: "option", options: atks.map(({ i }) => String(i)), min: 1, max: 1, prompt: `choose an attack of ${topDef(src).name} to use` });
-      const a = topDef(src).attacks![Number(pick)]!;
-      log(s, `copies ${topDef(src).name}'s ${a.name}`);
-      ctx.copying = true;
-      ctx.dmg = a.damage && a.damage > 0 ? a.damage : null;
-      if (a.effect) runEffect(ctx, a.effect);
-      ctx.copying = false;
-      return;
-    }
+    case "copyAttack": return run_copyAttack(ctx, e);
     case "endTurn": ctx.endTurn = true; return;
     case "evolve": case "useAgain": return notImplemented(e);
   }

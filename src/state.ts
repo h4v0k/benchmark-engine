@@ -2,6 +2,7 @@ import type { Rng } from "./rng.js";
 import { shuffle } from "./rng.js";
 import type { Action } from "./actions.js";
 import { defOf, type CardDef } from "./cards/model.js";
+import { formatEvent, type DrawReason, type EventInput, type GameEvent } from "./events.js";
 
 export type PlayerId = 0 | 1;
 export const other = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
@@ -89,7 +90,8 @@ export interface GameState {
   phase: Phase;
   players: [PlayerState, PlayerState];
   stadium?: { iid: string; owner: PlayerId };
-  log: string[];
+  /** structured event stream (src/events.ts); append-only within a game */
+  events: GameEvent[];
   winner?: PlayerId;
   winReason?: string;
   pendingChoice?: PendingChoice;
@@ -119,10 +121,51 @@ export function deepClone<T>(v: T): T {
   for (const k in v as Record<string, unknown>) out[k] = deepClone((v as Record<string, unknown>)[k]);
   return out as T;
 }
-export const cloneState = (s: GameState): GameState => deepClone(s);
+
+function clonePokemon(p: PokemonInPlay): PokemonInPlay {
+  const st = p.status;
+  return {
+    iid: p.iid, below: p.below.slice(), energy: p.energy.slice(), tool: p.tool, damage: p.damage,
+    status: { asleep: st.asleep, paralyzed: st.paralyzed, confused: st.confused, poisoned: st.poisoned, burned: st.burned },
+    turnPlayed: p.turnPlayed, evolvedThisTurn: p.evolvedThisTurn, usedAbilities: p.usedAbilities.slice(),
+    // Marker objects are never mutated after creation (only added / filtered out), so the objects are shared and only the list is copied
+    markers: p.markers.slice(),
+  };
+}
+function clonePlayer(ps: PlayerState): PlayerState {
+  const f = ps.flags;
+  return {
+    deck: ps.deck.slice(), hand: ps.hand.slice(), discard: ps.discard.slice(), prizes: ps.prizes.slice(),
+    active: ps.active && clonePokemon(ps.active), bench: ps.bench.map(clonePokemon), lostZone: ps.lostZone.slice(),
+    flags: {
+      energyAttachedThisTurn: f.energyAttachedThisTurn, supporterPlayedThisTurn: f.supporterPlayedThisTurn, stadiumPlayedThisTurn: f.stadiumPlayedThisTurn,
+      retreatedThisTurn: f.retreatedThisTurn, gxUsed: f.gxUsed, vstarUsed: f.vstarUsed, abilityNamesUsed: f.abilityNamesUsed.slice(),
+    },
+    markers: ps.markers.slice(), lastKOTurn: ps.lastKOTurn, usedGameAbilities: ps.usedGameAbilities.slice(),
+  };
+}
+/**
+ * Copy-on-write clone for `applyAction`: everything the interpreter can mutate is copied (card-id lists via `slice`, Pokémon and
+ * player records field by field), while data that is immutable once created is SHARED with the source state: event objects (the
+ * stream is an append-only list), markers, `rules`, `stadium`, and `pendingChoice` (with its `origin.base` snapshot — replaced, never edited).
+ * Several times faster than a generic deep clone, which dominated profiles (docs/ENGINE.md, Performance).
+ * Must list every GameState field: `src/test/engine.test.ts` checks clone == deepClone and that mutating a clone never leaks.
+ */
+export function cloneState(s: GameState): GameState {
+  return {
+    seed: s.seed, rng: { s: s.rng.s }, nextId: s.nextId, turn: s.turn, activePlayer: s.activePlayer, firstPlayer: s.firstPlayer, phase: s.phase,
+    players: [clonePlayer(s.players[0]), clonePlayer(s.players[1])],
+    stadium: s.stadium, events: s.events.slice(), winner: s.winner, winReason: s.winReason, pendingChoice: s.pendingChoice,
+    setup: s.setup && { mulls: [s.setup.mulls[0], s.setup.mulls[1]], acked: [s.setup.acked[0], s.setup.acked[1]], benchDone: [s.setup.benchDone[0], s.setup.benchDone[1]] },
+    rules: s.rules,
+  };
+}
 
 export const mintCard = (s: GameState, defId: string): string => `${defId}#${s.nextId++}`;
-export const log = (s: GameState, msg: string): void => { s.log.push(`T${s.turn} ${msg}`); };
+/** Append an event to the stream, stamped with the current global turn. */
+export const emit = (s: GameState, e: EventInput): void => { s.events.push({ ...e, turn: s.turn } as GameEvent); };
+/** The event stream rendered as prose lines (debugging, error messages, string-asserting tests). */
+export const logText = (s: { events: GameEvent[] }): string[] => s.events.map(formatEvent);
 
 export const inPlay = (ps: PlayerState): PokemonInPlay[] => (ps.active ? [ps.active, ...ps.bench] : [...ps.bench]);
 export interface Loc { player: PlayerId; p: PokemonInPlay; where: "active" | "bench" }
@@ -153,6 +196,14 @@ export function drawCards(s: GameState, pl: PlayerId, n: number): number {
   while (k < n && ps.deck.length) { ps.hand.push(ps.deck.shift()!); k++; }
   return k;
 }
+/** Draw with an event (nothing emitted when no card moved); returns the number drawn. */
+export function drawEmit(s: GameState, pl: PlayerId, n: number, reason: DrawReason): number {
+  const ps = s.players[pl];
+  const before = ps.hand.length;
+  const k = drawCards(s, pl, n);
+  if (k > 0) emit(s, { type: "draw", player: pl, count: k, cardIds: ps.hand.slice(before), reason });
+  return k;
+}
 /** Swap the benched Pokémon `benchIid` with the Active; old Active loses statuses and effects. */
 export function swapActive(s: GameState, pl: PlayerId, benchIid: string): void {
   const ps = s.players[pl];
@@ -181,7 +232,7 @@ export function shuffleDeck(s: GameState, pl: PlayerId): void { shuffle(s.player
 export function setWinner(s: GameState, w: PlayerId, reason: string): void {
   if (s.phase === "over") return;
   s.phase = "over"; s.winner = w; s.winReason = reason; s.pendingChoice = undefined;
-  log(s, `P${w} wins (${reason})`);
+  emit(s, { type: "gameEnd", winner: w, reason, turns: s.turn });
 }
 
 // ---------------------------------------------------------------- observation (hidden info redacted)
@@ -194,7 +245,17 @@ export interface Observation {
   stadium?: { iid: string; owner: PlayerId }; winner?: PlayerId; winReason?: string; rules: RulesConfig;
   players: [ObservedPlayer, ObservedPlayer];
   pendingChoice?: { player: PlayerId; kind: ChoiceKind; min: number; max: number; prompt: string; options?: string[]; optionCount: number };
-  log: string[];
+  /** public event stream; the opponent's drawn card ids are redacted */
+  events: GameEvent[];
+}
+/** Hide what `viewer` could not have seen: the opponent's decklist, drawn cards and (unrevealed) searches. */
+function redactEvent(e: GameEvent, viewer: PlayerId): GameEvent {
+  switch (e.type) {
+    case "gameStart": { const decks: [string[], string[]] = [[], []]; decks[viewer] = e.decks[viewer]; return { ...e, decks }; }
+    case "draw": return e.player === viewer ? e : { ...e, cardIds: [] };
+    case "search": return e.player === viewer ? e : { ...e, cardIds: [], cardNames: [] };
+    default: return e;
+  }
 }
 /** Player's view: own hand visible; opponent hand, all decks and all prizes are counts only. */
 export function observe(s: GameState, viewer: PlayerId): Observation {
@@ -215,6 +276,6 @@ export function observe(s: GameState, viewer: PlayerId): Observation {
       player: pc.player, kind: pc.kind, min: pc.min, max: pc.max, prompt: pc.prompt,
       options: pc.player === viewer ? [...pc.options] : undefined, optionCount: pc.options.length,
     },
-    log: [...s.log],
+    events: s.events.map((e) => redactEvent(e, viewer)),
   };
 }
